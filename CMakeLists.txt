@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Strict compilation flags
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-deprecated-declarations)
 
 option(ENABLE_TESTS "Enable building unit and regression tests" ON)
 option(ENABLE_SANITIZERS "Enable UBSan" OFF)

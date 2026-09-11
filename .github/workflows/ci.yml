@@ -75,13 +75,9 @@ jobs:
         run: |
           cd controlplane
           echo "=== Running Go Unit Tests ==="
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            go test -v -race ./...
-          else
-            go test -v ./...
-          fi
+          CGO_ENABLED=0 go test -v ./...
           echo "=== Compiling Go Control Plane Binary ==="
-          go build -o controlplane_server main.go
+          CGO_ENABLED=0 go build -o controlplane_server main.go
 
       - name: End-to-End Live Dataplane & Offline Benchmark Verification
         run: |

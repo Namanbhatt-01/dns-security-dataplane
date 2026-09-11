@@ -1,0 +1,35 @@
+services:
+  dataplane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["/app/dns_dataplane", "--port", "1053", "--ipc", "/tmp/sockets/dataplane.sock", "--upstream", "8.8.8.8:53"]
+    ports:
+      - "1053:1053/udp"
+    volumes:
+      - ipc-sockets:/tmp/sockets
+    restart: unless-stopped
+    networks:
+      - dns-net
+
+  controlplane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/controlplane_server", "-port", "8080", "-socket", "/tmp/sockets/dataplane.sock"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ipc-sockets:/tmp/sockets
+    depends_on:
+      - dataplane
+    restart: unless-stopped
+    networks:
+      - dns-net
+
+volumes:
+  ipc-sockets:
+
+networks:
+  dns-net:
+    driver: bridge

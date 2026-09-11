@@ -1,0 +1,25 @@
+# Build outputs
+build/
+build_asan/
+controlplane/controlplane_server
+*.o
+*.a
+*.so
+*.dylib
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+
+# OS and IDE files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Keep empirical PCAP evidence
+!evidence/packet-captures/*.pcap

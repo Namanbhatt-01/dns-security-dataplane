@@ -1,0 +1,204 @@
+{
+  "timestamp": "1789137234",
+  "matcher_benchmarks": [
+    {
+      "architecture": "Reverse-Label Suffix Trie",
+      "scale": 1000,
+      "build_ms": 0.739708,
+      "memory_mb": 0.1875,
+      "p50_ns": 292,
+      "p99_ns": 625,
+      "mean_ns": 338.611,
+      "throughput_mops": 2.95324,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Aho-Corasick Automaton",
+      "scale": 1000,
+      "build_ms": 0.987334,
+      "memory_mb": 1.25,
+      "p50_ns": 208,
+      "p99_ns": 292,
+      "mean_ns": 196.355,
+      "throughput_mops": 5.09281,
+      "fp_errors": 3
+    },
+    {
+      "architecture": "std::unordered_set (Exact)",
+      "scale": 1000,
+      "build_ms": 0.159792,
+      "memory_mb": 0.109375,
+      "p50_ns": 42,
+      "p99_ns": 83,
+      "mean_ns": 41.0296,
+      "throughput_mops": 24.3726,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Reverse-Label Suffix Trie",
+      "scale": 10000,
+      "build_ms": 2.4335,
+      "memory_mb": 0.84375,
+      "p50_ns": 167,
+      "p99_ns": 250,
+      "mean_ns": 186.222,
+      "throughput_mops": 5.36992,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Aho-Corasick Automaton",
+      "scale": 10000,
+      "build_ms": 6.23425,
+      "memory_mb": 16.2188,
+      "p50_ns": 167,
+      "p99_ns": 209,
+      "mean_ns": 159.157,
+      "throughput_mops": 6.28309,
+      "fp_errors": 3
+    },
+    {
+      "architecture": "std::unordered_set (Exact)",
+      "scale": 10000,
+      "build_ms": 0.55175,
+      "memory_mb": 0.40625,
+      "p50_ns": 0,
+      "p99_ns": 42,
+      "mean_ns": 17.857,
+      "throughput_mops": 56.0003,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Reverse-Label Suffix Trie",
+      "scale": 50000,
+      "build_ms": 11.4876,
+      "memory_mb": 3.67188,
+      "p50_ns": 167,
+      "p99_ns": 250,
+      "mean_ns": 178.873,
+      "throughput_mops": 5.59056,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Aho-Corasick Automaton",
+      "scale": 50000,
+      "build_ms": 65.6886,
+      "memory_mb": 94.3438,
+      "p50_ns": 166,
+      "p99_ns": 209,
+      "mean_ns": 156.938,
+      "throughput_mops": 6.37195,
+      "fp_errors": 3
+    },
+    {
+      "architecture": "std::unordered_set (Exact)",
+      "scale": 50000,
+      "build_ms": 2.23867,
+      "memory_mb": 1.82812,
+      "p50_ns": 0,
+      "p99_ns": 42,
+      "mean_ns": 15.7938,
+      "throughput_mops": 63.3161,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Reverse-Label Suffix Trie",
+      "scale": 100000,
+      "build_ms": 23.8888,
+      "memory_mb": 4.59375,
+      "p50_ns": 167,
+      "p99_ns": 250,
+      "mean_ns": 178.759,
+      "throughput_mops": 5.59412,
+      "fp_errors": 0
+    },
+    {
+      "architecture": "Aho-Corasick Automaton",
+      "scale": 100000,
+      "build_ms": 130.828,
+      "memory_mb": 162.984,
+      "p50_ns": 167,
+      "p99_ns": 209,
+      "mean_ns": 157.819,
+      "throughput_mops": 6.33638,
+      "fp_errors": 3
+    },
+    {
+      "architecture": "std::unordered_set (Exact)",
+      "scale": 100000,
+      "build_ms": 4.55917,
+      "memory_mb": 2.32812,
+      "p50_ns": 0,
+      "p99_ns": 42,
+      "mean_ns": 16.1496,
+      "throughput_mops": 61.9211,
+      "fp_errors": 0
+    }
+  ],
+  "cache_benchmarks": [
+    {
+      "operation": "LRU Cache HIT",
+      "p50_ns": 125,
+      "p99_ns": 208,
+      "mean_ns": 142.093,
+      "throughput_mops": 7.03763
+    },
+    {
+      "operation": "LRU Cache MISS",
+      "p50_ns": 84,
+      "p99_ns": 167,
+      "mean_ns": 94.9761,
+      "throughput_mops": 10.529
+    },
+    {
+      "operation": "Stale Gen Invalidation",
+      "p50_ns": 84,
+      "p99_ns": 208,
+      "mean_ns": 101.697,
+      "throughput_mops": 9.83318
+    }
+  ],
+  "entropy_benchmarks": [
+    {
+      "traffic_type": "Benign Apex Domain",
+      "domain": "google.com",
+      "entropy": 1.9183,
+      "latency_ns": 2.71332,
+      "alert": false
+    },
+    {
+      "traffic_type": "Benign Corporate FQDN",
+      "domain": "internal-portal.corp.cisco.com",
+      "entropy": 3.24022,
+      "latency_ns": 44.4283,
+      "alert": false
+    },
+    {
+      "traffic_type": "Benign CDN Edge Domain",
+      "domain": "scontent-iad3-1.xx.fbcdn.net",
+      "entropy": 3.50689,
+      "latency_ns": 28.3992,
+      "alert": false
+    },
+    {
+      "traffic_type": "Iodine DNS Tunneling",
+      "domain": "a9f3b8c2d1e0f4a7b5c8d3e2f1a0b9c8.evil-tunnel.org",
+      "entropy": 3.81955,
+      "latency_ns": 51.1358,
+      "alert": true
+    },
+    {
+      "traffic_type": "Base32 High-Entropy Exfil",
+      "domain": "yj4e2w3bon2gg33nk5vg423fozsw45df.malicious-exfil.biz",
+      "entropy": 3.99173,
+      "latency_ns": 54.3267,
+      "alert": true
+    },
+    {
+      "traffic_type": "Random DGA Domain (CryptoLocker)",
+      "domain": "vjklqwxyprmzbctd.top",
+      "entropy": 4,
+      "latency_ns": 27.9433,
+      "alert": true
+    }
+  ]
+}

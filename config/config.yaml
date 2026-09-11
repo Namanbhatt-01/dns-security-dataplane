@@ -1,0 +1,36 @@
+# ==============================================================================
+# ARM64 DNS Security Dataplane: Production Configuration
+# ==============================================================================
+
+server:
+  listen_address: "0.0.0.0"
+  listen_port: 1053
+  protocol: "UDP"
+  worker_threads: 1 # Single-process event loop (scale horizontally via SO_REUSEPORT)
+
+upstream:
+  primary: "8.8.8.8:53"
+  fallback: "1.1.1.1:53"
+  timeout_ms: 1000
+  max_retries: 2
+  txid_randomization: true # Closes Kaminsky DNS cache poisoning vector (ADR-001)
+
+cache:
+  capacity: 100000 # Max LRU entries
+  default_ttl_seconds: 300
+  max_ttl_seconds: 86400
+  min_ttl_seconds: 10
+  generation_validation: true # Closes stale ALLOW cache bypass vector (ADR-004)
+
+security:
+  shannon_entropy:
+    enabled: true
+    threshold: 3.80
+    mode: "ALERT_AND_ALLOW" # Loophole #7: Never hard-drop without threat intel confirmation
+  default_action: "ALLOW" # "ALLOW" or "BLOCK_NXDOMAIN"
+  sinkhole_ipv4: "127.0.0.1"
+
+control_plane:
+  http_port: 8080
+  ipc_socket_path: "/tmp/dns_dataplane_control.sock"
+  metrics_enabled: true # Prometheus /metrics endpoint

@@ -1,0 +1,90 @@
+name: ARM64 DNS Security Dataplane CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build libbsd-dev
+
+      - name: Install macOS Dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja
+
+      - name: Compile C++ Dataplane & Run Unit Tests
+        run: |
+          mkdir -p build
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=ON
+          cmake --build build --parallel
+          echo "=== Executing 29/29 TDD Test Suite ==="
+          ./build/dataplane/tests/dns_tests
+
+      - name: Run Hostile Wire Protocol Fuzzer
+        run: |
+          echo "=== Fuzzing Wire Protocol Parser with 50,000 Hostile Inputs ==="
+          ./build/dataplane/tests/fuzz_dns_parser 50000
+
+      - name: Run Matcher Architectural Comparison Benchmark
+        run: |
+          echo "=== Running Suffix Trie vs Aho-Corasick Benchmark ==="
+          ./build/dataplane/tests/benchmark_matcher_comparison
+
+      - name: Build & Run Under Clang Sanitizers (UBSan / ASan)
+        run: |
+          mkdir -p build_asan
+          cmake -B build_asan -S . -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTS=ON -DENABLE_SANITIZERS=ON
+          cmake --build build_asan --parallel
+          echo "=== Executing Tests under UndefinedBehaviorSanitizer & AddressSanitizer ==="
+          ./build_asan/dataplane/tests/dns_tests
+
+      - name: Build & Test Go Control Plane
+        run: |
+          cd controlplane
+          echo "=== Running Go Unit Tests ==="
+          go test -v -race ./...
+          echo "=== Compiling Go Control Plane Binary ==="
+          go build -o controlplane_server main.go
+
+      - name: End-to-End Live Dataplane & Offline Benchmark Verification
+        run: |
+          echo "=== Starting C++ Dataplane in Background ==="
+          ./build/dataplane/dns_dataplane --port 1053 --quiet &
+          DP_PID=$!
+          sleep 1
+
+          echo "=== Executing Python Benchmark Concurrency Suite ==="
+          python3 offline/benchmarks/runner.py --port 1053
+
+          echo "=== Regenerating Visual SVG Plots & Performance Reports ==="
+          python3 offline/benchmarks/plot.py
+
+          kill -9 $DP_PID || true

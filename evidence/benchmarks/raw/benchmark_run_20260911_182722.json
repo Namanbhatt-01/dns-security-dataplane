@@ -1,0 +1,142 @@
+[
+  {
+    "timestamp": "2026-09-11T12:57:15.585986Z",
+    "workload": "BLOCKED_NXDOMAIN",
+    "concurrency": 1,
+    "total_queries": 1000,
+    "duration_sec": 0.0808,
+    "qps": 12377.34,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 33.04,
+      "mean": 62.08,
+      "p50": 48.12,
+      "p90": 135.88,
+      "p95": 161.39,
+      "p99": 191.61,
+      "p99.9": 246.92,
+      "max": 414.71
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:16.486597Z",
+    "workload": "BLOCKED_NXDOMAIN",
+    "concurrency": 10,
+    "total_queries": 5000,
+    "duration_sec": 0.287,
+    "qps": 17419.86,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 51.0,
+      "mean": 362.44,
+      "p50": 323.54,
+      "p90": 619.95,
+      "p95": 745.09,
+      "p99": 999.39,
+      "p99.9": 1451.27,
+      "max": 1761.29
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:17.688154Z",
+    "workload": "BLOCKED_NXDOMAIN",
+    "concurrency": 50,
+    "total_queries": 10000,
+    "duration_sec": 0.5897,
+    "qps": 16958.25,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 47.92,
+      "mean": 1820.48,
+      "p50": 1601.0,
+      "p90": 3354.19,
+      "p95": 3906.61,
+      "p99": 5126.5,
+      "p99.9": 6863.83,
+      "max": 9709.83
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:18.468640Z",
+    "workload": "CACHE_HIT",
+    "concurrency": 1,
+    "total_queries": 1000,
+    "duration_sec": 0.0976,
+    "qps": 10249.77,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 30.29,
+      "mean": 84.37,
+      "p50": 61.21,
+      "p90": 163.33,
+      "p95": 228.36,
+      "p99": 410.54,
+      "p99.9": 633.58,
+      "max": 717.25
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:19.370804Z",
+    "workload": "CACHE_HIT",
+    "concurrency": 10,
+    "total_queries": 5000,
+    "duration_sec": 0.2952,
+    "qps": 16939.16,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 46.46,
+      "mean": 404.87,
+      "p50": 349.65,
+      "p90": 706.81,
+      "p95": 871.08,
+      "p99": 1243.08,
+      "p99.9": 1619.3,
+      "max": 2165.88
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:20.570989Z",
+    "workload": "CACHE_HIT",
+    "concurrency": 50,
+    "total_queries": 10000,
+    "duration_sec": 0.5863,
+    "qps": 17056.35,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 41.75,
+      "mean": 1846.7,
+      "p50": 1662.83,
+      "p90": 3304.03,
+      "p95": 3960.33,
+      "p99": 5220.84,
+      "p99.9": 6698.72,
+      "max": 8202.46
+    }
+  },
+  {
+    "timestamp": "2026-09-11T12:57:21.589752Z",
+    "workload": "MIXED",
+    "concurrency": 10,
+    "total_queries": 5000,
+    "duration_sec": 0.2897,
+    "qps": 17261.44,
+    "success_rate": 100.0,
+    "error_count": 0,
+    "latency_us": {
+      "min": 46.25,
+      "mean": 398.85,
+      "p50": 355.52,
+      "p90": 674.69,
+      "p95": 806.21,
+      "p99": 1125.76,
+      "p99.9": 1471.13,
+      "max": 2074.5
+    }
+  }
+]

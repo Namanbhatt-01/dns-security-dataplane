@@ -1,0 +1,3650 @@
+ARM64 DNS SECURITY DATAPLANE
+CISCO-FOCUSED MASTER PROJECT PLAN — VERSION 3.0
+============================================================
+
+PROJECT NAME
+arm64-dns-security-dataplane
+
+PRIMARY TITLE
+ARM64 DNS Security Dataplane
+
+PORTFOLIO SUBTITLE
+A C++/Linux network-security dataplane with Go control-plane management,
+reproducible performance evaluation, protocol fuzzing, fault injection,
+and packet-level validation.
+
+RESEARCH / ENGINEERING TITLE
+Design, Implementation, and Experimental Evaluation of a Resource-Conscious
+DNS Security Dataplane on ARM64 Systems
+
+DOCUMENT PURPOSE
+This is the master build plan.
+
+The objective is NOT to create the largest possible DNS-security project.
+
+The objective is to build ONE coherent network-security system and use it to
+demonstrate:
+
+    1. Network programming
+    2. C/C++ systems programming
+    3. Linux engineering
+    4. DNS protocol understanding
+    5. Security engineering
+    6. Concurrency
+    7. Memory safety
+    8. Debugging
+    9. Profiling
+    10. Performance engineering
+    11. Fault handling
+    12. Reproducible experimentation
+    13. Engineering judgment
+
+CORE PRINCIPLE
+
+    BUILD -> BREAK -> MEASURE -> DEBUG -> FIX -> PROVE
+
+Do not move forward merely because code compiles.
+
+A stage is complete only when its correctness evidence exists.
+
+
+============================================================
+1. PROJECT VISION
+============================================================
+
+Build a local DNS security dataplane that receives DNS requests, validates
+and parses them, normalizes domain names, evaluates security policy and
+threat intelligence, optionally performs lightweight anomaly analysis,
+uses a bounded TTL-aware cache, forwards permitted queries to an upstream
+resolver, returns valid responses, and emits structured operational/security
+telemetry.
+
+The project must behave like a small network appliance rather than a
+collection of unrelated demonstrations.
+
+PRIMARY DATA PATH
+
+    DNS CLIENT
+        |
+        | UDP/TCP DNS
+        v
+    C++ DATA PLANE
+        |
+        +--> packet validation
+        +--> DNS parsing
+        +--> normalization
+        +--> cache lookup
+        +--> policy evaluation
+        +--> domain matching
+        +--> threat classification
+        +--> optional anomaly analysis
+        +--> decision
+        |
+        +---- BLOCK
+        +---- SINKHOLE
+        +---- ALERT + ALLOW
+        +---- REJECT
+        |
+        +---- ALLOW / FORWARD
+                    |
+                    v
+              UPSTREAM DNS
+                    |
+                    v
+              DNS RESPONSE
+                    |
+                    v
+                 CLIENT
+
+CONTROL PATH
+
+    Go Control Plane
+        |
+        +--> configuration
+        +--> policy CRUD
+        +--> candidate policy load
+        +--> validation
+        +--> atomic activation
+        +--> rollback
+        +--> health
+        +--> metrics
+        +--> administration
+
+OFFLINE PATH
+
+    Python
+        |
+        +--> threat-feed ingestion
+        +--> normalization
+        +--> validation
+        +--> deduplication
+        +--> categorization
+        +--> dataset versioning
+        +--> hashing
+        +--> benchmark orchestration
+        +--> statistical analysis
+        +--> plots
+        +--> report artifacts
+
+
+============================================================
+2. WHAT THIS PROJECT IS NOT
+============================================================
+
+DO NOT TURN THIS INTO:
+
+    - a full recursive resolver
+    - a complete authoritative DNS server
+    - a complete IDS/IPS
+    - a complete browser ad blocker
+    - a complete DoH/DoT proxy
+    - a full DNSSEC implementation
+    - a general-purpose firewall
+    - an ML showcase
+    - a giant dashboard
+    - a production enterprise DNS product
+
+Do not claim production readiness.
+
+The project is a serious engineering prototype and experimental dataplane
+unless substantially stronger validation later justifies a narrower claim.
+
+
+============================================================
+3. WHY THIS PROJECT IS STRONG FOR A NETWORK/SECURITY ENGINEERING ROLE
+============================================================
+
+The project intentionally crosses several engineering boundaries without
+making the architecture unnecessarily complicated.
+
+NETWORKING
+    sockets
+    UDP
+    TCP
+    IP
+    DNS
+    packet parsing
+    upstream forwarding
+    timeouts
+    packet captures
+
+SYSTEMS
+    C++
+    Linux
+    memory management
+    concurrency
+    synchronization
+    resource limits
+    profiling
+    debugging
+
+SECURITY
+    policy enforcement
+    threat intelligence
+    allow/block precedence
+    malformed-input handling
+    abuse resistance
+    anomaly detection
+    auditability
+
+SOFTWARE ENGINEERING
+    control/data-plane separation
+    versioned configuration
+    atomic updates
+    rollback
+    tests
+    CI
+    reproducible builds
+    documentation
+
+PERFORMANCE
+    QPS
+    latency percentiles
+    CPU
+    memory
+    cache behavior
+    matcher scaling
+    concurrency scaling
+    I/O model comparison
+
+The project should demonstrate engineering decisions with evidence rather
+than feature count.
+
+
+============================================================
+4. TARGET ENGINEERING PROFILE
+============================================================
+
+The repository should make the following statement without saying it
+directly:
+
+    "I can work close to the network and operating system,
+     understand the protocol, write C++ safely, debug failures,
+     measure performance, and make architecture decisions from evidence."
+
+PRIMARY TARGET
+
+    Network + Security Software Engineering
+
+SECONDARY TARGETS
+
+    Systems Software
+    Network Security
+    Dataplane / Packet Processing
+    Infrastructure Software
+    Performance Engineering
+
+
+============================================================
+5. LANGUAGE RESPONSIBILITIES
+============================================================
+
+C++17/20
+--------
+
+C++ owns the live DNS dataplane.
+
+Responsibilities:
+
+    - socket operations
+    - packet receive/send
+    - DNS validation
+    - DNS parsing
+    - response construction
+    - normalization
+    - policy evaluation
+    - domain matching
+    - cache
+    - concurrency
+    - upstream communication
+    - anomaly feature extraction
+    - resource limits
+    - structured event generation
+
+RULE:
+
+    Keep the hot path in C++.
+
+Go
+--
+
+Go owns the control plane.
+
+Responsibilities:
+
+    - configuration API
+    - policy management
+    - candidate policy handling
+    - activation/rollback
+    - health
+    - metrics
+    - administration
+    - controlled operational commands
+
+RULE:
+
+    Do not send every DNS packet through Go.
+
+Python
+------
+
+Python owns offline workflows.
+
+Responsibilities:
+
+    - threat-feed processing
+    - dataset creation
+    - dataset validation
+    - benchmark orchestration
+    - result analysis
+    - graph generation
+    - report generation
+
+RULE:
+
+    Python never sits on the live DNS request path.
+
+Dashboard
+---------
+
+Only after backend stability.
+
+The dashboard is an observability surface, NOT the project's core.
+
+
+============================================================
+6. HIGH-LEVEL ARCHITECTURE
+============================================================
+
+                    +-----------------------+
+                    |       DNS CLIENT      |
+                    +-----------+-----------+
+                                |
+                                | UDP/TCP :53
+                                v
+                    +-----------------------+
+                    |   C++ DNS DATAPLANE   |
+                    +-----------------------+
+                                |
+                 +--------------+--------------+
+                 |                             |
+                 v                             v
+        +----------------+             +----------------+
+        | Packet Parser  |             | Resource Guard |
+        +-------+--------+             +----------------+
+                |
+                v
+        +----------------+
+        | Normalization  |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Cache Lookup   |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Policy Engine  |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Domain Matcher |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Threat Intel   |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Anomaly Engine |
+        +-------+--------+
+                |
+                v
+        +----------------+
+        | Decision       |
+        +---+---+---+---+
+            |   |   |
+      BLOCK |   |   | FORWARD
+            |   |   +----------------------+
+            |   |                          |
+            |   v                          v
+            | SINKHOLE                +---------+
+            |                         | UPSTREAM|
+            |                         +----+----+
+            |                              |
+            +---------------+--------------+
+                            |
+                            v
+                       DNS RESPONSE
+                            |
+                            v
+                         CLIENT
+
+
+CONTROL PLANE
+
+    Go API
+       |
+       +--> configuration
+       +--> candidate policy
+       +--> validation
+       +--> atomic activation
+       +--> rollback
+       +--> health/metrics
+       |
+       v
+    C++ dataplane
+
+
+OFFLINE INTELLIGENCE
+
+    Python feed pipeline
+       |
+       v
+    versioned validated dataset
+       |
+       v
+    controlled activation
+
+
+============================================================
+7. HOT-PATH DESIGN
+============================================================
+
+The hot path must be explicit.
+
+HOT PATH
+
+    receive
+      ->
+    bounded validation
+      ->
+    parse
+      ->
+    normalize
+      ->
+    cache lookup
+      ->
+    policy/matcher
+      ->
+    decision
+      ->
+    upstream if required
+      ->
+    response
+      ->
+    telemetry accounting
+
+Do not put these into every request unless deliberately justified:
+
+    - HTTP calls
+    - Python calls
+    - database queries
+    - filesystem reads
+    - blocking control-plane calls
+    - expensive JSON serialization
+    - remote threat-intelligence lookups
+
+Telemetry must use bounded/non-blocking mechanisms where practical.
+
+The system should remain operational if the control plane is unavailable.
+
+
+============================================================
+8. DNS PROTOCOL SCOPE
+============================================================
+
+MUST HAVE
+
+    - DNS header
+    - transaction ID
+    - flags
+    - opcode handling
+    - QDCOUNT validation
+    - QNAME parsing
+    - QTYPE
+    - QCLASS
+    - valid response construction
+    - UDP
+    - bounded packet size
+    - upstream forwarding
+    - timeout handling
+    - response validation
+    - malformed packet rejection
+
+HIGH VALUE
+
+    - TCP DNS
+    - truncated-response handling
+    - retry behavior
+    - IPv4
+    - IPv6
+    - response transaction matching
+    - bounded upstream concurrency
+
+OUT OF CORE SCOPE
+
+    - full recursive resolution
+    - authoritative DNS
+    - complete DNSSEC validation
+    - DoH
+    - DoT
+    - TLS interception
+
+
+============================================================
+9. DNS PARSER SECURITY MODEL
+============================================================
+
+The parser receives attacker-controlled bytes.
+
+Treat every byte as untrusted.
+
+VALIDATION MUST COVER
+
+    minimum packet length
+    header availability
+    field bounds
+    QDCOUNT limits
+    label length <= protocol limit
+    total name length limits
+    compression-pointer bounds
+    compression-pointer loop protection
+    supported opcode
+    supported class/type policy
+    maximum packet size
+    malformed termination
+    truncated input
+
+PARSER RULE
+
+    Never read before proving the bytes exist.
+
+    Never follow an unbounded pointer chain.
+
+    Never trust counts from the packet.
+
+    Never allocate based on unbounded attacker-controlled values.
+
+PARSER OUTPUT
+
+Use a structured internal representation rather than passing raw offsets
+through the whole application.
+
+
+============================================================
+10. DOMAIN NORMALIZATION
+============================================================
+
+Input example:
+
+    WWW.Example.COM.
+
+Normalized form:
+
+    www.example.com
+
+Handle:
+
+    - lowercase
+    - trailing root dot
+    - label boundaries
+    - invalid labels
+    - total length
+    - empty labels where invalid
+    - safe character handling
+
+The normalized representation must be used consistently by:
+
+    cache
+    matcher
+    policy
+    telemetry
+    anomaly engine
+
+
+============================================================
+11. DECISION ENGINE
+============================================================
+
+Every query receives exactly one primary decision.
+
+RECOMMENDED PRECEDENCE
+
+    1. INVALID / MALFORMED
+           -> REJECT
+
+    2. EXPLICIT ALLOWLIST
+           -> ALLOW
+
+    3. EXPLICIT BLOCK
+           -> BLOCK
+
+    4. PARENT-DOMAIN BLOCK
+           -> BLOCK
+
+    5. THREAT-INTELLIGENCE MATCH
+           -> BLOCK or ALERT
+
+    6. ANOMALY SIGNAL
+           -> ALERT initially
+
+    7. DEFAULT
+           -> ALLOW / FORWARD
+
+The precedence must be represented in code and tests.
+
+Every security decision must be explainable.
+
+Example:
+
+    action:
+        BLOCK
+
+    reason:
+        THREAT_INTELLIGENCE_MATCH
+
+    category:
+        MALWARE
+
+    rule_id:
+        feed-12345
+
+    dataset_version:
+        2026-09-01
+
+    matcher:
+        SUFFIX_TRIE
+
+
+============================================================
+12. ACTION MODEL
+============================================================
+
+ALLOW
+    Forward query or return valid cached response.
+
+BLOCK
+    Return a controlled blocking DNS response.
+
+SINKHOLE
+    Return a controlled lab address for test environments.
+
+ALERT_AND_ALLOW
+    Record suspicious behavior but permit resolution.
+
+REJECT
+    Reject malformed/unsupported traffic.
+
+Do not use real malicious infrastructure for testing.
+
+Use reserved/documentation domains and controlled lab domains.
+
+
+============================================================
+13. POLICY MODEL
+============================================================
+
+Internal rule:
+
+    rule_id
+    domain
+    match_type
+    category
+    action
+    source
+    confidence
+    enabled
+    priority
+    created_at
+    updated_at
+    dataset_version
+
+Initial categories:
+
+    ADS
+    TRACKER
+    MALWARE
+    PHISHING
+    BOTNET
+    CUSTOM
+    ALLOWLIST
+
+Initial match types:
+
+    EXACT
+    DOMAIN_SUFFIX
+
+Do not support every external blocklist syntax.
+
+The importer should report:
+
+    total lines
+    comments
+    valid
+    invalid
+    duplicates
+    unsupported
+    imported
+
+
+============================================================
+14. DOMAIN MATCHING ENGINE
+============================================================
+
+BASELINE
+
+    std::unordered_set
+
+SECURITY-CORRECT STRUCTURE
+
+    reverse-label suffix trie
+
+OPTIONAL RESEARCH IMPLEMENTATION
+
+    Aho-Corasick
+
+Important:
+
+    Do NOT assume Aho-Corasick is superior for DNS suffix matching.
+
+DNS suffix matching has domain-boundary semantics.
+
+Rule:
+
+    example.com
+
+Must match:
+
+    example.com
+    www.example.com
+    a.b.example.com
+
+Must NOT match:
+
+    notexample.com
+    example.com.evil.test
+
+EXPERIMENT
+
+Compare:
+
+    unordered_set
+    suffix trie
+    Aho-Corasick
+
+At:
+
+    10K
+    50K
+    100K
+    500K
+    1M where practical
+
+Measure:
+
+    lookup latency
+    p50
+    p95
+    p99
+    throughput
+    memory
+    construction time
+    update time
+
+
+============================================================
+15. THREAT INTELLIGENCE PIPELINE
+============================================================
+
+Python pipeline:
+
+    SOURCE
+      ->
+    IMPORT
+      ->
+    FORMAT CHECK
+      ->
+    NORMALIZE
+      ->
+    VALIDATE
+      ->
+    DEDUPLICATE
+      ->
+    CATEGORIZE
+      ->
+    VERSION
+      ->
+    HASH
+      ->
+    GENERATE CANDIDATE DATASET
+      ->
+    C++ VALIDATION
+      ->
+    ATOMIC ACTIVATION
+
+CRITICAL SAFETY PROPERTY
+
+    Failed update MUST NOT replace the last known-good dataset.
+
+Record:
+
+    source
+    timestamp
+    version
+    record count
+    invalid count
+    duplicate count
+    dataset hash
+    validation status
+
+Respect source licensing and terms.
+
+External feeds must be optional.
+
+
+============================================================
+16. ATOMIC POLICY UPDATES
+============================================================
+
+This is a high-value systems-engineering component.
+
+Never mutate the active matcher in-place while queries are using it.
+
+Preferred conceptual model:
+
+    ACTIVE DATASET
+          |
+          | new update
+          v
+    CANDIDATE DATASET
+          |
+       validate
+          |
+       construct
+          |
+       self-check
+          |
+       integrity/hash
+          |
+          v
+    ATOMIC ACTIVATION
+          |
+          v
+    NEW ACTIVE DATASET
+
+If validation fails:
+
+    keep previous active dataset.
+
+The project must test:
+
+    - successful update
+    - invalid update
+    - corrupted dataset
+    - duplicate rules
+    - concurrent queries during update
+    - rollback
+    - control-plane failure during update
+
+
+============================================================
+17. CACHE DESIGN
+============================================================
+
+CACHE KEY
+
+    normalized_domain + QTYPE + QCLASS
+
+CACHE VALUE
+
+    response
+    expiry
+    original TTL information
+    relevant metadata
+
+REQUIREMENTS
+
+    - TTL-aware expiration
+    - bounded entry count
+    - bounded memory
+    - expiration cleanup
+    - QTYPE separation
+    - QCLASS separation
+    - eviction behavior
+    - no indefinite caching
+
+MEASURE
+
+    cache hits
+    cache misses
+    hit ratio
+    entries
+    evictions
+    upstream requests avoided
+    cache lookup latency
+
+EXPERIMENT
+
+    cache OFF
+    cache ON
+
+Compare:
+
+    p50
+    p95
+    p99
+    QPS
+    CPU
+    upstream request rate
+
+
+============================================================
+18. CONCURRENCY
+============================================================
+
+Start simple.
+
+VERSION A
+
+    controlled single-threaded baseline
+
+VERSION B
+
+    worker pool
+
+VERSION C
+
+    event-driven/nonblocking architecture
+
+VERSION D
+
+    io_uring, only as a controlled research extension
+
+Do not optimize concurrency before correctness.
+
+Test:
+
+    1 client
+    10
+    100
+    500
+    1000
+    higher only if stable
+
+Measure:
+
+    QPS
+    p50
+    p95
+    p99
+    CPU
+    RSS
+    errors
+    timeouts
+    queue depth
+    dropped work
+    context switches where measurable
+    lock contention where applicable
+
+
+============================================================
+19. MEMORY-SAFETY ENGINEERING
+============================================================
+
+C++ networking code must be tested under sanitizers.
+
+Required validation:
+
+    AddressSanitizer
+    UndefinedBehaviorSanitizer
+    ThreadSanitizer
+
+Target:
+
+    parser
+    response generation
+    matcher
+    cache
+    policy updates
+    concurrency
+    telemetry path
+
+Rules:
+
+    no use-after-free
+    no out-of-bounds access
+    no undefined behavior
+    no data races detected in tested paths
+
+Every discovered defect becomes:
+
+    reproduce
+      ->
+    minimized test
+      ->
+    fix
+      ->
+    regression test
+
+
+============================================================
+20. FUZZING
+============================================================
+
+Fuzzing is a first-class security activity.
+
+PRIMARY TARGET
+
+    DNS packet parser
+
+FUZZ INPUT
+
+    arbitrary byte sequences
+
+EXPECTED PROPERTY
+
+    Parser must not:
+
+        crash
+        hang
+        read out of bounds
+        allocate without bounds
+        follow infinite compression chains
+
+SECONDARY TARGETS
+
+    DNS name decoder
+    response parser
+    policy dataset parser
+
+Maintain:
+
+    seed corpus
+    crashing inputs
+    minimized inputs
+    fixed regression cases
+    campaign metadata
+
+Evidence directory:
+
+    evidence/fuzzing/
+
+
+============================================================
+21. FAULT INJECTION
+============================================================
+
+The system must be deliberately broken.
+
+UPSTREAM FAULTS
+
+    timeout
+    unavailable
+    connection reset
+    malformed response
+    slow response
+
+POLICY FAULTS
+
+    invalid dataset
+    corrupted dataset
+    duplicate rules
+    incompatible version
+    failed activation
+
+RESOURCE FAULTS
+
+    high query rate
+    cache pressure
+    worker saturation
+    bounded queue overflow
+    memory pressure
+    disk-full simulation where applicable
+
+CONTROL-PLANE FAULTS
+
+    API unavailable
+    API restart
+    invalid command
+    concurrent update
+
+EXPECTED PROPERTY
+
+    The dataplane should degrade safely and predictably.
+
+
+============================================================
+22. RESILIENCE REQUIREMENTS
+============================================================
+
+If upstream fails:
+
+    bounded timeout
+    controlled error behavior
+    no indefinite blocking
+
+If feed update fails:
+
+    preserve last known-good dataset
+
+If control plane crashes:
+
+    dataplane continues with last valid configuration
+
+If policy update is invalid:
+
+    reject update
+
+If traffic exceeds configured limits:
+
+    enforce bounded resources
+
+If telemetry destination is unavailable:
+
+    dataplane should not become permanently blocked by telemetry
+
+
+============================================================
+23. RESOURCE LIMITS
+============================================================
+
+Explicitly bound:
+
+    maximum DNS packet size
+    maximum QNAME length
+    maximum label length
+    maximum pointer depth
+    maximum cache entries
+    maximum cache memory
+    maximum policy size
+    maximum event queue
+    maximum upstream concurrency
+    maximum API request size
+    maximum API rate where exposed
+
+The project must document what happens when every limit is reached.
+
+
+============================================================
+24. ANOMALY DETECTION
+============================================================
+
+Start deterministic.
+
+FEATURES
+
+    label length
+    domain length
+    entropy
+    digit ratio
+    character diversity
+    query frequency
+    NXDOMAIN frequency
+    unique-subdomain count
+    repeated random-looking labels
+
+Example score:
+
+    0-39       LOW
+    40-69      MEDIUM
+    70-100     HIGH
+
+Output:
+
+    POSSIBLE_DNS_ANOMALY
+
+Important:
+
+    A suspicion score is NOT proof of maliciousness.
+
+Default action:
+
+    ALERT
+
+Do not auto-block until false-positive behavior is evaluated.
+
+
+============================================================
+25. DNS TUNNELING HEURISTICS
+============================================================
+
+Track behavior by parent domain.
+
+Indicators:
+
+    unusually long labels
+    high entropy
+    many unique subdomains
+    high query frequency
+    excessive NXDOMAIN
+    encoded-looking labels
+
+Initial mode:
+
+    ALERT
+
+Research question:
+
+    Can lightweight DNS behavioral heuristics identify suspicious
+    query patterns while adding limited dataplane overhead?
+
+Evaluate:
+
+    normal traffic
+    synthetic suspicious traffic
+    mixed traffic
+
+Measure:
+
+    detection rate
+    false positives
+    processing overhead
+
+
+============================================================
+26. DO NOT OVERBUILD ML
+============================================================
+
+No neural network is required.
+
+No LLM is required.
+
+No production DGA classifier should be claimed.
+
+If lexical/DGA analysis is implemented, label it:
+
+    lexical anomaly analysis
+
+Potential features:
+
+    entropy
+    length
+    digit ratio
+    character diversity
+    n-grams if justified
+
+ML is future work.
+
+The core value of the project is systems/network engineering.
+
+
+============================================================
+27. TELEMETRY DESIGN
+============================================================
+
+SECURITY EVENT
+
+    timestamp
+    domain
+    QTYPE
+    action
+    category
+    rule_id
+    decision_reason
+    latency_us
+    cache_status
+    upstream_status
+    risk_score
+    dataset_version
+
+ENGINEERING EVENT / INTERNAL STAGE METRICS
+
+    receive
+    parse
+    normalize
+    cache
+    policy
+    matcher
+    anomaly
+    upstream
+    response
+
+This allows analysis of:
+
+    "Where did the latency go?"
+
+Example conceptual breakdown:
+
+    total       210 us
+    parse        12 us
+    normalize     3 us
+    cache         2 us
+    policy        7 us
+    matcher       8 us
+    anomaly       9 us
+    upstream    165 us
+    response      4 us
+
+Actual values MUST come from measurement.
+
+
+============================================================
+28. METRICS
+============================================================
+
+Core:
+
+    dns_queries_total
+    dns_queries_allowed
+    dns_queries_blocked
+    dns_queries_sinkholed
+    dns_queries_rejected
+
+Latency:
+
+    dns_query_latency
+    dns_decision_latency
+    dns_upstream_latency
+
+Cache:
+
+    dns_cache_hits
+    dns_cache_misses
+    dns_cache_entries
+    dns_cache_evictions
+
+Security:
+
+    threat_matches_total
+    anomaly_alerts_total
+    blocked_by_category
+    malformed_queries
+
+Upstream:
+
+    upstream_errors
+    upstream_timeouts
+    upstream_requests
+
+System:
+
+    process_cpu
+    process_rss
+    active_requests
+    worker_queue_depth
+    worker_utilization
+    policy_reload_count
+    policy_reload_failures
+
+Prometheus-compatible naming is preferred.
+
+
+============================================================
+29. PRIVACY
+============================================================
+
+DNS telemetry can be sensitive.
+
+Default:
+
+    no external telemetry
+
+Use:
+
+    configurable logging
+    configurable retention
+    minimal client information
+    structured events
+    controlled access
+
+Do not claim "privacy preserving" without specifying:
+
+    what is collected
+    what is retained
+    where it is stored
+    who can access it
+
+
+============================================================
+30. GO CONTROL PLANE
+============================================================
+
+Initial endpoints:
+
+    GET    /health
+    GET    /api/v1/stats
+    GET    /api/v1/config
+    GET    /api/v1/policies
+    POST   /api/v1/policies
+    DELETE /api/v1/policies/{id}
+    POST   /api/v1/reload
+    GET    /api/v1/events
+    GET    /metrics
+
+Security defaults:
+
+    localhost-only
+    strict input validation
+    bounded request body
+    safe errors
+    no arbitrary command execution
+    authentication before remote exposure
+    rate limiting if remote exposure is enabled
+
+The API is a control surface, not a shell.
+
+
+============================================================
+31. C++ <-> GO CONTROL INTERFACE
+============================================================
+
+Preferred order:
+
+    1. Unix domain socket / local IPC
+    2. narrow C API + CGO only if justified
+    3. localhost TCP only if operationally useful
+
+Avoid:
+
+    DNS packet
+        ->
+    Go
+        ->
+    CGO
+        ->
+    C++
+        ->
+    Go
+        ->
+    response
+
+The live packet path should remain independent.
+
+If CGO is used:
+
+    explicit ownership
+    explicit allocation/free rules
+    no retained Go pointers in C++
+    minimal boundary crossings
+    batch control updates
+
+
+============================================================
+32. PACKET-LEVEL VALIDATION
+============================================================
+
+Every major protocol milestone must be validated with:
+
+    dig
+    nslookup where useful
+    tcpdump
+    Wireshark
+
+Capture:
+
+    client -> gateway
+    gateway -> upstream
+    upstream -> gateway
+    gateway -> client
+
+Verify:
+
+    transaction ID
+    flags
+    QNAME
+    QTYPE
+    response code
+    source/destination
+    timing
+    retransmission behavior where applicable
+
+Do not rely only on application logs.
+
+
+============================================================
+33. TESTING STRATEGY
+============================================================
+
+UNIT TESTS
+
+DNS:
+
+    valid query
+    truncated header
+    malformed header
+    invalid labels
+    pointer edge cases
+    pointer loop
+    pointer out of bounds
+    unsupported opcode
+    response construction
+
+NORMALIZATION:
+
+    uppercase
+    trailing dot
+    invalid input
+    boundary handling
+
+MATCHER:
+
+    exact match
+    parent-domain match
+    subdomain match
+    false boundary match
+    duplicates
+    empty dataset
+
+POLICY:
+
+    allowlist precedence
+    explicit block
+    parent block
+    threat match
+    anomaly alert
+    combined cases
+
+CACHE:
+
+    hit
+    miss
+    expiry
+    QTYPE separation
+    QCLASS separation
+    eviction
+
+DETECTION:
+
+    normal
+    long label
+    high entropy
+    repeated subdomains
+    NXDOMAIN-heavy behavior
+
+INTEGRATION:
+
+    client -> gateway -> upstream
+    client -> gateway -> block
+    client -> gateway -> cache
+    client -> gateway -> API policy update
+
+REGRESSION:
+
+    every fixed bug gets a permanent test.
+
+
+============================================================
+34. SECURITY TESTING MATRIX
+============================================================
+
+Test class              Expected result
+------------------------------------------------------------
+Truncated packet        reject safely
+Oversized packet        bounded handling
+Pointer loop            reject safely
+Pointer OOB             reject safely
+Invalid label           reject safely
+Malformed response      reject safely
+Invalid policy           reject update
+Corrupt feed             retain old dataset
+API abuse                reject/limit
+Upstream timeout         bounded failure
+High QPS                 bounded resource behavior
+Concurrent reload        no partial policy state
+Telemetry overload       dataplane remains functional
+
+
+============================================================
+35. DEBUGGING TOOLCHAIN
+============================================================
+
+The project should demonstrate practical use of:
+
+    gdb
+    lldb where appropriate
+    AddressSanitizer
+    UndefinedBehaviorSanitizer
+    ThreadSanitizer
+    perf on Linux
+    tcpdump
+    Wireshark
+    strace
+    iproute2
+    compiler warnings
+    static analysis
+    Git bisect where useful
+
+Compile with strong warnings.
+
+Treat warnings as engineering signals, not noise.
+
+
+============================================================
+36. PERFORMANCE ENGINEERING
+============================================================
+
+Do not start with optimization.
+
+FIRST:
+
+    establish correctness
+
+SECOND:
+
+    establish baseline
+
+THIRD:
+
+    profile
+
+FOURTH:
+
+    identify bottleneck
+
+FIFTH:
+
+    optimize
+
+SIXTH:
+
+    rerun the same benchmark
+
+SEVENTH:
+
+    keep the optimization only if evidence supports it.
+
+Performance claims must identify:
+
+    workload
+    machine
+    OS
+    compiler
+    build flags
+    dataset
+    rule count
+    concurrency
+    cache state
+    upstream configuration
+    duration
+    warmup
+    project commit
+
+
+============================================================
+37. PERFORMANCE METRICS
+============================================================
+
+PRIMARY:
+
+    QPS
+    p50
+    p95
+    p99
+    error rate
+    timeout rate
+
+SYSTEM:
+
+    CPU
+    RSS
+    context switches where measurable
+    syscall behavior where relevant
+
+SECURITY:
+
+    blocked percentage
+    threat matches
+    anomaly alerts
+
+CACHE:
+
+    hit ratio
+    upstream requests avoided
+
+PER-STAGE:
+
+    receive
+    parse
+    normalize
+    cache
+    policy
+    matcher
+    anomaly
+    upstream
+    response
+
+
+============================================================
+38. PROFILING
+============================================================
+
+Benchmark tells:
+
+    WHAT happened.
+
+Profiling tells:
+
+    WHY it happened.
+
+Required investigation examples:
+
+    high CPU
+        ->
+    perf
+        ->
+    hotspot
+        ->
+    source line/function
+        ->
+    hypothesis
+        ->
+    code change
+        ->
+    benchmark
+        ->
+    accepted/rejected optimization
+
+Evidence:
+
+    evidence/perf/
+
+Store:
+
+    baseline profile
+    optimized profile
+    flamegraph
+    explanation
+    benchmark comparison
+
+
+============================================================
+39. PERFORMANCE REGRESSION TESTING
+============================================================
+
+The repository should eventually detect performance regressions.
+
+Example:
+
+    baseline p95 < 500 us
+
+Current:
+
+    p95 = 710 us
+
+Result:
+
+    PERFORMANCE REGRESSION
+
+Do not require exact identical benchmark numbers.
+
+Use justified thresholds and document environmental variability.
+
+Every optimization should have:
+
+    before
+    change
+    after
+    explanation
+    regression test if applicable
+
+
+============================================================
+40. EXPERIMENTAL RESEARCH QUESTIONS
+============================================================
+
+PRIMARY ENGINEERING QUESTION
+
+Can a resource-conscious C++ DNS security dataplane on ARM64 provide
+explainable DNS-layer security while maintaining predictable latency
+under increasing rule-set size, concurrency, cache state, and inspection
+complexity?
+
+RQ1 — MATCHING
+
+Which domain-matching structure provides the best latency/memory/update
+trade-off for DNS suffix matching?
+
+RQ2 — CACHE
+
+How much can TTL-aware caching reduce upstream work and query latency?
+
+RQ3 — SECURITY COST
+
+What incremental processing cost is introduced by:
+
+    policy only
+    policy + threat intelligence
+    policy + threat intelligence + anomaly detection
+
+RQ4 — RULE SCALE
+
+How does increasing rule-set size affect:
+
+    memory
+    startup
+    lookup
+    update time
+
+RQ5 — CONCURRENCY
+
+How does the dataplane behave as concurrency increases toward saturation?
+
+RQ6 — RESILIENCE
+
+How does the system degrade under upstream, policy, resource, and
+control-plane failures?
+
+RQ7 — CONTROL/DATA SEPARATION
+
+What operational overhead does the control-plane boundary introduce,
+and does it remain outside the normal DNS hot path?
+
+RQ8 — I/O MODEL
+
+Under controlled workloads, what performance/CPU trade-off exists between:
+
+    blocking sockets
+    epoll
+    io_uring
+
+The I/O experiment is optional and late-stage.
+
+
+============================================================
+41. NOVELTY STRATEGY
+============================================================
+
+DO NOT CLAIM NOVELTY IN:
+
+    DNS filtering
+    DNS caching
+    threat intelligence
+    tries
+    Aho-Corasick
+    C++
+    Go APIs
+    telemetry
+
+The defensible contribution is:
+
+    coherent implementation
+    controlled experimental design
+    security validation
+    failure analysis
+    performance characterization
+    reproducibility
+    measured architectural trade-offs
+
+A strong result:
+
+    "Under workload W and rule scale R, matcher X reduced p99 lookup
+     latency by Y% while increasing memory by Z%."
+
+A strong negative result:
+
+    "Aho-Corasick did not outperform the suffix trie for the tested
+     DNS suffix workload and was therefore not selected for the final
+     dataplane."
+
+Both are valuable.
+
+Never invent results.
+
+
+============================================================
+42. EXPERIMENT MATRIX
+============================================================
+
+EXPERIMENT A — MATCHER
+
+    unordered_set
+    suffix trie
+    Aho-Corasick
+
+    Rule scales:
+        10K
+        50K
+        100K
+        500K
+        1M where practical
+
+    Measure:
+        lookup
+        p50/p95/p99
+        memory
+        build
+        update
+
+EXPERIMENT B — CACHE
+
+    OFF
+    ON
+
+    Measure:
+        p50/p95/p99
+        QPS
+        upstream requests
+        hit ratio
+        CPU
+
+EXPERIMENT C — CONCURRENCY
+
+    1
+    10
+    100
+    500
+    1000
+    higher if stable
+
+    Measure:
+        QPS
+        latency
+        CPU
+        RSS
+        errors
+        queue behavior
+
+EXPERIMENT D — POLICY COST
+
+    baseline/no security inspection
+    policy
+    policy + threat intelligence
+    policy + threat intelligence + anomaly
+
+    Measure:
+        incremental latency
+        CPU
+        QPS
+
+EXPERIMENT E — RULE SCALE
+
+    Measure:
+        startup
+        memory
+        lookup
+        update
+
+EXPERIMENT F — ANOMALY
+
+    normal
+    suspicious
+    mixed
+
+    Measure:
+        detection
+        false positives
+        overhead
+
+EXPERIMENT G — RESILIENCE
+
+    upstream failure
+    upstream timeout
+    invalid policy
+    corrupt feed
+    control-plane restart
+    high traffic
+    resource pressure
+
+    Measure:
+        error behavior
+        recovery
+        policy preservation
+        availability
+
+EXPERIMENT H — I/O MODEL
+
+    blocking
+    epoll
+    io_uring
+
+    Keep constant:
+        parser
+        policy
+        matcher
+        cache
+        workload
+        machine
+        compiler
+        dataset
+
+    Measure:
+        QPS
+        p50/p95/p99
+        CPU
+        RSS
+        errors
+        syscall behavior where useful
+
+
+============================================================
+43. BENCHMARK METHODOLOGY
+============================================================
+
+Every benchmark artifact records:
+
+    timestamp
+    git commit
+    machine
+    architecture
+    OS
+    compiler
+    compiler version
+    compiler flags
+    build type
+    dataset version
+    dataset hash
+    rule count
+    workload
+    client count
+    concurrency
+    warmup
+    duration
+    cache state
+    upstream configuration
+
+RAW OUTPUT:
+
+    CSV and/or JSON
+
+ANALYSIS:
+
+    Python
+
+GRAPHS:
+
+    Python-generated from raw data
+
+RULE:
+
+    Never manually type benchmark numbers into the final report.
+
+
+============================================================
+44. WORKLOAD DESIGN
+============================================================
+
+NORMAL
+
+    realistic-looking domains
+    repeated and varied queries
+
+BLOCK
+
+    controlled test domains
+
+CACHE
+
+    repeated queries
+    known cacheable responses
+
+CONCURRENCY
+
+    multiple clients
+    controlled arrival rates
+
+ANOMALY
+
+    long labels
+    high entropy
+    random-looking subdomains
+    unique subdomains
+    NXDOMAIN-heavy behavior
+
+MIXED
+
+    normal
+    blocked
+    cacheable
+    suspicious
+
+Do not use personal browsing history.
+
+
+============================================================
+45. ARM64 / LINUX EVALUATION
+============================================================
+
+DEVELOPMENT PLATFORM
+
+    Apple Silicon ARM64 can be used for native development.
+
+PRIMARY SYSTEMS TARGET
+
+    Linux ARM64 should be used for serious systems validation whenever
+    the environment is available.
+
+Record:
+
+    CPU
+    architecture
+    OS
+    kernel version
+    compiler
+    compiler version
+    build flags
+    optimization level
+    benchmark conditions
+
+If experiments are run on Apple Silicon:
+
+    state that explicitly.
+
+If experiments are run on Linux ARM64:
+
+    state that explicitly.
+
+Do NOT write:
+
+    "This proves ARM64 is faster."
+
+Write:
+
+    "On the tested ARM64 platform under the specified workload..."
+
+
+============================================================
+46. LINUX NETWORKING SKILLS TO LEARN
+============================================================
+
+Before advanced optimization, understand:
+
+    socket()
+    bind()
+    recvfrom()
+    sendto()
+    recvmsg()
+    sendmsg()
+    connect()
+    setsockopt()
+    fcntl()
+    poll()
+    epoll()
+    close()
+
+Then:
+
+    UDP
+    TCP
+    IPv4
+    IPv6
+    DNS
+    routing
+    interfaces
+    namespaces
+    packet capture
+    firewall interaction
+
+Useful tools:
+
+    ip
+    ss
+    tcpdump
+    dig
+    ping
+    traceroute where relevant
+    Wireshark
+    strace
+    perf
+
+
+============================================================
+47. CONTROLLED SECURITY TEST ENVIRONMENT
+============================================================
+
+Never depend on real malicious domains.
+
+Create:
+
+    lab.test
+    blocked.test
+    malware.test
+    suspicious.test
+
+Use local authoritative/mock upstream infrastructure where possible.
+
+Example:
+
+    client
+      ->
+    gateway
+      ->
+    controlled upstream
+      ->
+    controlled response
+
+This gives deterministic tests.
+
+
+============================================================
+48. REPOSITORY STRUCTURE
+============================================================
+
+arm64-dns-security-dataplane/
+
+    dataplane/
+        cpp/
+            dns/
+                server.cpp
+                server.h
+                packet.cpp
+                packet.h
+                parser.cpp
+                parser.h
+                response.cpp
+                response.h
+                resolver.cpp
+                resolver.h
+
+            engine/
+                policy_engine.cpp
+                policy_engine.h
+                domain_normalizer.cpp
+                domain_normalizer.h
+                domain_trie.cpp
+                domain_trie.h
+                aho_corasick.cpp
+                aho_corasick.h
+                decision.cpp
+                decision.h
+
+            cache/
+                dns_cache.cpp
+                dns_cache.h
+
+            detection/
+                entropy.cpp
+                dns_anomaly.cpp
+                dns_tunnel.cpp
+
+            telemetry/
+                event.cpp
+                event.h
+                metrics.cpp
+                metrics.h
+
+            runtime/
+                worker_pool.cpp
+                worker_pool.h
+                resource_limits.cpp
+                resource_limits.h
+
+            main.cpp
+
+    controlplane/
+        go/
+            cmd/
+            api/
+            control/
+            config/
+            metrics/
+            health/
+
+    intelligence/
+        python/
+            feeds/
+                ingest.py
+                normalize.py
+                validate.py
+                version.py
+            analytics/
+                analyze.py
+                plots.py
+                report.py
+            benchmarks/
+
+    tests/
+        unit/
+        integration/
+        regression/
+        fuzz/
+        fault-injection/
+        sanitizer/
+
+    benchmarks/
+        workloads/
+        runners/
+        results/
+        analysis/
+
+    evidence/
+        packet-captures/
+        fuzzing/
+        sanitizer/
+        perf/
+        memory/
+        failures/
+        regressions/
+
+    data/
+        policies/
+        feeds/
+        test/
+
+    docs/
+        architecture/
+        protocol/
+        security/
+        performance/
+        operations/
+        decisions/
+        research/
+
+    dashboard/
+
+    deployment/
+        docker/
+
+    .github/
+        workflows/
+
+    Makefile
+    README.md
+    LICENSE
+
+
+============================================================
+49. ARCHITECTURE DECISION RECORDS
+============================================================
+
+Create:
+
+    docs/decisions/
+
+Files:
+
+    ADR-001-cpp-dataplane.md
+    ADR-002-go-control-plane.md
+    ADR-003-suffix-trie.md
+    ADR-004-cache-design.md
+    ADR-005-concurrency-model.md
+    ADR-006-policy-update-model.md
+    ADR-007-telemetry-design.md
+    ADR-008-io-model.md
+
+Each ADR contains:
+
+    Context
+    Problem
+    Alternatives
+    Decision
+    Evidence
+    Trade-offs
+    Rejected alternatives
+    Consequences
+
+This prevents architecture from looking arbitrary.
+
+
+============================================================
+50. EVIDENCE-FIRST PROJECT STRUCTURE
+============================================================
+
+Every important claim must have evidence.
+
+CLAIM
+
+    "Parser is robust."
+
+EVIDENCE
+
+    unit tests
+    fuzzing
+    sanitizer run
+    regression corpus
+
+CLAIM
+
+    "Cache improves performance."
+
+EVIDENCE
+
+    raw benchmark
+    cache OFF
+    cache ON
+    analysis
+
+CLAIM
+
+    "Matcher X is better."
+
+EVIDENCE
+
+    same workload
+    same dataset
+    raw measurements
+    memory measurements
+    analysis
+
+CLAIM
+
+    "System survives policy failure."
+
+EVIDENCE
+
+    fault-injection test
+    logs
+    policy version before/after
+    regression test
+
+
+============================================================
+51. CI / AUTOMATION
+============================================================
+
+PULL REQUEST PIPELINE
+
+    format/check
+        ->
+    C++ build
+        ->
+    Go build
+        ->
+    Python tests
+        ->
+    unit tests
+        ->
+    integration tests
+        ->
+    sanitizer checks
+        ->
+    static checks
+
+MAIN BRANCH
+
+    all above
+        ->
+    benchmark smoke test
+        ->
+    artifact generation
+
+Release/research run:
+
+    reproducible benchmark suite
+        ->
+    raw CSV/JSON
+        ->
+    graphs
+        ->
+    report artifacts
+
+
+============================================================
+52. BUILD SYSTEM
+============================================================
+
+Use one clear top-level build interface.
+
+Example targets:
+
+    make build
+    make test
+    make test-unit
+    make test-integration
+    make fuzz
+    make sanitize
+    make run
+    make benchmark
+    make benchmark-matcher
+    make benchmark-cache
+    make benchmark-concurrency
+    make analyze
+    make docs
+    make clean
+
+Do not create complicated build infrastructure before the application
+itself works.
+
+
+============================================================
+53. DEVELOPMENT PHASES
+============================================================
+
+PHASE 0 — ENGINEERING ENVIRONMENT
+
+Learn and validate:
+
+    C++
+    Linux
+    Git
+    Make
+    sockets
+    basic debugging
+
+DELIVERABLE:
+
+    clean build environment
+
+
+PHASE 1 — NETWORKING FOUNDATION
+
+Build:
+
+    UDP echo server
+    receive/send
+    logging
+    graceful shutdown
+
+EVIDENCE:
+
+    source
+    test
+    packet capture
+
+
+PHASE 2 — DNS PARSER
+
+Build:
+
+    header parser
+    QNAME parser
+    QTYPE/QCLASS
+    validation
+
+EVIDENCE:
+
+    unit tests
+    malformed tests
+
+
+PHASE 3 — DNS RESPONSE
+
+Build:
+
+    valid response construction
+    transaction ID handling
+    response flags
+
+EVIDENCE:
+
+    dig output
+    tcpdump/Wireshark capture
+
+
+PHASE 4 — HARD-CODED POLICY
+
+Build:
+
+    allow
+    block
+    sinkhole
+    reject
+
+EVIDENCE:
+
+    policy tests
+    integration tests
+
+
+PHASE 5 — NORMALIZATION + MATCHER
+
+Build:
+
+    normalization
+    unordered_set baseline
+    suffix trie
+
+EVIDENCE:
+
+    boundary tests
+    matcher tests
+
+
+PHASE 6 — UPSTREAM FORWARDING
+
+Build:
+
+    forward allowed queries
+    validate response
+    timeout
+    error handling
+
+EVIDENCE:
+
+    packet capture
+    integration test
+    upstream fault test
+
+
+PHASE 7 — CACHE
+
+Build:
+
+    TTL-aware cache
+    expiry
+    bounded capacity
+    eviction
+
+EVIDENCE:
+
+    cache tests
+    cache ON/OFF benchmark
+
+
+PHASE 8 — CONCURRENCY
+
+Build:
+
+    baseline
+    worker pool
+
+EVIDENCE:
+
+    race testing
+    concurrency benchmark
+
+
+PHASE 9 — BASELINE PERFORMANCE
+
+Establish:
+
+    QPS
+    p50
+    p95
+    p99
+    CPU
+    RSS
+
+EVIDENCE:
+
+    raw benchmark data
+    environment metadata
+
+
+PHASE 10 — MEMORY SAFETY
+
+Run:
+
+    ASan
+    UBSan
+    TSan
+
+EVIDENCE:
+
+    sanitizer logs
+    fixed regressions
+
+
+PHASE 11 — FUZZING
+
+Fuzz:
+
+    DNS parser
+    name decoder
+    response parser
+
+EVIDENCE:
+
+    corpus
+    campaign report
+    minimized crashes
+    regression tests
+
+
+PHASE 12 — THREAT DATASET
+
+Build:
+
+    Python ingestion
+    validation
+    deduplication
+    categorization
+    version/hash
+
+EVIDENCE:
+
+    dataset manifest
+    validation report
+
+
+PHASE 13 — ATOMIC POLICY UPDATES
+
+Build:
+
+    candidate
+    validation
+    activation
+    rollback
+
+EVIDENCE:
+
+    concurrent-update tests
+    failure tests
+
+
+PHASE 14 — GO CONTROL PLANE
+
+Build:
+
+    health
+    stats
+    policy API
+    reload
+    metrics
+
+EVIDENCE:
+
+    API tests
+    security tests
+
+
+PHASE 15 — TELEMETRY
+
+Build:
+
+    structured security events
+    stage metrics
+
+EVIDENCE:
+
+    sample events
+    schema documentation
+
+
+PHASE 16 — ANOMALY ENGINE
+
+Build:
+
+    deterministic heuristics
+    alert-only behavior
+
+EVIDENCE:
+
+    controlled workload evaluation
+
+
+PHASE 17 — FAULT INJECTION
+
+Break:
+
+    upstream
+    policy
+    feed
+    API
+    resources
+
+EVIDENCE:
+
+    failure matrix
+    recovery results
+
+
+PHASE 18 — PROFILING
+
+Use:
+
+    perf
+    flamegraphs
+    syscall tracing
+
+Find real bottlenecks.
+
+EVIDENCE:
+
+    before profile
+    change
+    after profile
+
+
+PHASE 19 — RESEARCH EXPERIMENTS
+
+Run:
+
+    matcher study
+    cache study
+    policy-cost study
+    rule-scale study
+    concurrency study
+    anomaly study
+
+
+PHASE 20 — I/O RESEARCH
+
+Only if core system is excellent:
+
+    blocking
+    epoll
+    io_uring
+
+Keep the application workload constant.
+
+
+PHASE 21 — REPRODUCIBILITY
+
+Build:
+
+    benchmark runner
+    metadata collection
+    raw artifact storage
+    graph generation
+
+
+PHASE 22 — DASHBOARD
+
+Only after backend stability.
+
+Show:
+
+    queries
+    decisions
+    cache
+    latency
+    CPU
+    memory
+    threats
+    anomaly alerts
+    policy version
+
+
+PHASE 23 — FINAL SECURITY REVIEW
+
+Review:
+
+    parser
+    API
+    policy
+    dataset
+    resource limits
+    logs
+    privacy
+    failure modes
+
+
+PHASE 24 — FINAL DEMONSTRATION
+
+Perform the complete evidence-backed demo.
+
+
+============================================================
+54. CHECKPOINT SYSTEM
+============================================================
+
+M0  Environment
+M1  UDP server
+M2  DNS parser
+M3  DNS response
+M4  Policy
+M5  Normalization
+M6  Matcher
+M7  Upstream
+M8  Cache
+M9  Concurrency
+M10 Baseline benchmark
+M11 Sanitizers
+M12 Fuzzing
+M13 Threat dataset
+M14 Atomic update
+M15 Go API
+M16 Telemetry
+M17 Metrics
+M18 Anomaly
+M19 Fault injection
+M20 Profiling
+M21 Research benchmarks
+M22 I/O comparison
+M23 Reproducibility
+M24 Final security review
+M25 Final demo
+
+RULE:
+
+    A checkpoint passes only when its evidence exists.
+
+
+============================================================
+55. PRIORITY SYSTEM
+============================================================
+
+P0 — MUST FINISH
+
+    C++ UDP DNS server
+    DNS parser
+    response generation
+    normalization
+    policy
+    suffix matching
+    upstream forwarding
+    TTL cache
+    concurrency baseline
+    tests
+    threat dataset
+    structured telemetry
+    baseline benchmarks
+
+P1 — MUST MAKE EXCELLENT
+
+    TCP DNS
+    IPv4/IPv6
+    sanitizers
+    fuzzing
+    resource limits
+    atomic policy updates
+    Go control plane
+    metrics
+    packet-level validation
+    fault injection
+    profiling
+    automated benchmarks
+
+P2 — RESEARCH / DIFFERENTIATION
+
+    matcher comparison
+    cache study
+    rule-scale study
+    security-processing overhead
+    concurrency saturation
+    anomaly evaluation
+    control-boundary evaluation
+    I/O model comparison
+
+P3 — OPTIONAL
+
+    dashboard polish
+    Docker polish
+    SIEM-style export
+    browser demonstration
+
+CUT FROM CORE
+
+    full recursive resolver
+    full DNSSEC
+    DoH
+    DoT
+    ML-first detection
+    giant UI
+    support for every blocklist syntax
+
+
+============================================================
+56. FINAL DEMONSTRATION SCRIPT
+============================================================
+
+1. Start the gateway.
+
+2. Show the architecture:
+       C++ dataplane
+       Go control plane
+       Python offline pipeline
+
+3. Run an allowed DNS query.
+
+4. Show packet capture.
+
+5. Run a controlled blocked query.
+
+6. Show:
+       action
+       category
+       rule
+       reason
+       latency
+
+7. Repeat a cacheable query.
+
+8. Show:
+       cache hit
+       lower processing/upstream activity
+
+9. Add a policy through Go API.
+
+10. Prove the dataplane sees the new policy.
+
+11. Trigger an invalid policy update.
+
+12. Prove:
+       update rejected
+       previous policy remains active
+
+13. Send malformed DNS inputs.
+
+14. Show:
+       safe rejection
+       no crash
+
+15. Show sanitizer/fuzzing evidence.
+
+16. Run suspicious synthetic DNS workload.
+
+17. Show anomaly alert.
+
+18. Stop/restart upstream.
+
+19. Show bounded timeout/failure behavior.
+
+20. Stop Go control plane.
+
+21. Show dataplane continues with last valid state.
+
+22. Run benchmark.
+
+23. Show raw results.
+
+24. Show Python-generated analysis.
+
+25. Show profile/flamegraph.
+
+26. Explain one real optimization or rejected optimization.
+
+27. Show research comparison.
+
+28. Explain one surprising result.
+
+29. State limitations honestly.
+
+
+============================================================
+57. FINAL README STRUCTURE
+============================================================
+
+README must be recruiter-readable in approximately 60 seconds.
+
+SECTION 1
+
+    Project title
+    one-sentence description
+
+SECTION 2
+
+    Architecture diagram
+
+SECTION 3
+
+    Why it exists
+
+SECTION 4
+
+    Technical highlights
+
+        C++
+        Linux
+        DNS
+        networking
+        concurrency
+        security
+        fuzzing
+        sanitizers
+        profiling
+        benchmarking
+
+SECTION 5
+
+    Quick start
+
+SECTION 6
+
+    Security model
+
+SECTION 7
+
+    Testing
+
+SECTION 8
+
+    Performance methodology
+
+SECTION 9
+
+    Experimental results
+
+SECTION 10
+
+    Engineering decisions
+
+SECTION 11
+
+    Failure/resilience evidence
+
+SECTION 12
+
+    Limitations
+
+SECTION 13
+
+    Future work
+
+Do not put a wall of marketing text before the technical evidence.
+
+
+============================================================
+58. INTERVIEW STORY
+============================================================
+
+The final explanation should sound like this:
+
+"I wanted to understand how a security function can be implemented close to
+the network dataplane rather than as a high-level application. I built a
+DNS security dataplane in C++ with a separate Go control plane and Python
+offline intelligence pipeline.
+
+The C++ engine receives DNS traffic, validates and parses untrusted packets,
+normalizes domains, applies security policy, performs suffix matching,
+caches eligible responses, forwards permitted queries upstream, and
+generates structured events.
+
+The important part was not only implementing the features. I treated the
+project as a systems-engineering experiment. I fuzz-tested the DNS parser,
+ran it under sanitizers, validated traffic with packet captures, injected
+upstream and policy failures, profiled the dataplane, and measured the
+effects of cache state, rule-set size, matcher choice, concurrency and
+security inspection.
+
+For the performance work, I kept the workload controlled and preserved raw
+benchmark data rather than making unsupported performance claims. I also
+investigated whether different I/O models actually changed the bottleneck
+under the tested workload."
+
+Do not memorize this word-for-word.
+
+The final answer must reflect what was ACTUALLY implemented.
+
+
+============================================================
+59. ENGINEERING QUESTIONS YOU MUST BE ABLE TO ANSWER
+============================================================
+
+NETWORKING
+
+    Why UDP first?
+    Why does DNS use UDP?
+    When is TCP required?
+    What happens when a response is truncated?
+    How does the gateway communicate with upstream?
+    How do you handle timeout/retry?
+
+PARSER
+
+    How do you prevent out-of-bounds reads?
+    How do compression pointers work?
+    How do you prevent pointer loops?
+    What packet fields are attacker-controlled?
+
+POLICY
+
+    Why this precedence?
+    How do allowlists interact with blocklists?
+    How do you guarantee atomic updates?
+
+CACHE
+
+    What is the cache key?
+    Why must QTYPE/QCLASS be included?
+    How do TTLs affect cache correctness?
+    What happens under memory pressure?
+
+CONCURRENCY
+
+    Why worker pool?
+    What is shared?
+    Where are locks?
+    Can you reduce contention?
+    What happens at saturation?
+
+C++
+
+    Who owns this memory?
+    When is it freed?
+    Why is this pointer safe?
+    What happens under concurrent access?
+
+SECURITY
+
+    What is your threat model?
+    What happens with malformed input?
+    How do you protect the API?
+    What happens if threat intelligence is poisoned?
+
+PERFORMANCE
+
+    What is your baseline?
+    Where is the bottleneck?
+    How did you prove the optimization helped?
+    Why p99 instead of only average latency?
+
+RESEARCH
+
+    What was your hypothesis?
+    What variables were controlled?
+    What was surprising?
+    What result disproved your assumption?
+
+OPERATIONS
+
+    What happens if the control plane dies?
+    What happens if upstream dies?
+    What happens if a policy update is invalid?
+    What happens when resources are exhausted?
+
+
+============================================================
+60. "NO CLAIM WITHOUT EVIDENCE" RULE
+============================================================
+
+Every important statement follows:
+
+    CLAIM
+      ->
+    TEST
+      ->
+    RAW DATA
+      ->
+    ANALYSIS
+      ->
+    CONCLUSION
+
+Examples:
+
+Do not say:
+
+    "High performance."
+
+Say:
+
+    "Under workload X, the tested build sustained Y QPS at Z ms p99."
+
+Do not say:
+
+    "Secure parser."
+
+Say:
+
+    "The parser passed the documented malformed-input suite and fuzzing
+     campaign under sanitizer instrumentation."
+
+Do not say:
+
+    "Atomic updates."
+
+Say:
+
+    "Concurrent update tests showed queries observed either the old or
+     new validated policy state, with no partially activated dataset."
+
+
+============================================================
+61. EVIDENCE DIRECTORY RULES
+============================================================
+
+Store actual artifacts.
+
+    evidence/
+        fuzzing/
+        sanitizer/
+        perf/
+        packet-captures/
+        failures/
+        regressions/
+
+Each artifact should contain:
+
+    date
+    git commit
+    environment
+    command
+    result
+    interpretation
+
+Do not fill the repository with screenshots when machine-readable evidence
+can be stored instead.
+
+
+============================================================
+62. DOCUMENTATION RULES
+============================================================
+
+Every subsystem gets:
+
+    purpose
+    inputs
+    outputs
+    invariants
+    failure modes
+    tests
+    performance considerations
+
+Every major design decision gets an ADR.
+
+Every benchmark gets methodology.
+
+Every limitation is documented.
+
+Every external dataset has provenance.
+
+
+============================================================
+63. REPRODUCIBILITY
+============================================================
+
+A fresh environment should be able to:
+
+    clone repository
+    build dataplane
+    build control plane
+    create Python environment
+    generate test dataset
+    start controlled upstream
+    start gateway
+    run integration tests
+    run fuzz/sanitizer checks where supported
+    run benchmark
+    generate plots
+    inspect raw results
+
+Environment-dependent experiments must clearly state dependencies.
+
+
+============================================================
+64. DEFINITION OF DONE
+============================================================
+
+CORE CORRECTNESS
+
+    [ ] DNS requests parse correctly
+    [ ] malformed packets are safely rejected
+    [ ] responses are valid
+    [ ] policy precedence is deterministic
+    [ ] domain boundaries are correct
+    [ ] upstream forwarding works
+    [ ] cache respects TTL
+    [ ] concurrency is race-tested
+
+SECURITY
+
+    [ ] parser fuzzed
+    [ ] sanitizer checks pass
+    [ ] resource limits exist
+    [ ] API is bounded
+    [ ] policy updates validate before activation
+    [ ] rollback preserves last-known-good state
+    [ ] failure behavior documented
+
+OPERATIONS
+
+    [ ] structured telemetry
+    [ ] metrics
+    [ ] health endpoint
+    [ ] upstream failure handling
+    [ ] control-plane failure handling
+
+PERFORMANCE
+
+    [ ] baseline benchmark
+    [ ] raw results
+    [ ] matcher study
+    [ ] cache study
+    [ ] rule-scale study
+    [ ] concurrency study
+    [ ] policy-cost study
+    [ ] profiling evidence
+
+RESEARCH
+
+    [ ] research questions defined
+    [ ] workloads defined
+    [ ] variables controlled
+    [ ] experiments reproducible
+    [ ] negative results preserved
+    [ ] limitations documented
+
+PRESENTATION
+
+    [ ] clean README
+    [ ] architecture diagram
+    [ ] quick start
+    [ ] final demo
+    [ ] evidence directory
+    [ ] ADRs
+    [ ] final technical report
+
+
+============================================================
+65. FIRST SESSION — ABSOLUTELY DO NOT OVERBUILD
+============================================================
+
+Create only:
+
+    arm64-dns-security-dataplane/
+        dataplane/
+            cpp/
+        tests/
+        docs/
+        README.md
+        Makefile
+
+FIRST FILE:
+
+    dataplane/cpp/main.cpp
+
+FIRST GOAL:
+
+    bind localhost UDP socket
+    receive packet
+    print size/source
+    send controlled response
+    exit cleanly
+
+Then:
+
+    checkpoint M1
+
+Only after M1 passes:
+
+    DNS parser
+
+Only after M2 passes:
+
+    DNS response
+
+The repository should grow from working vertical slices.
+
+
+============================================================
+66. BUILD ORDER — FINAL
+============================================================
+
+    UDP
+      ->
+    DNS parser
+      ->
+    DNS response
+      ->
+    normalization
+      ->
+    hard-coded policy
+      ->
+    matcher
+      ->
+    upstream
+      ->
+    cache
+      ->
+    concurrency
+      ->
+    baseline benchmark
+      ->
+    sanitizers
+      ->
+    fuzzing
+      ->
+    threat dataset
+      ->
+    atomic updates
+      ->
+    Go control plane
+      ->
+    telemetry
+      ->
+    metrics
+      ->
+    anomaly detection
+      ->
+    fault injection
+      ->
+    profiling
+      ->
+    research experiments
+      ->
+    I/O comparison
+      ->
+    reproducibility
+      ->
+    dashboard
+      ->
+    final security review
+      ->
+    final report/demo
+
+
+============================================================
+67. WHAT TO REMOVE IF TIME RUNS SHORT
+============================================================
+
+REMOVE FIRST:
+
+    dashboard polish
+    browser demo
+    SIEM enhancements
+    Docker polish
+    DGA/ML
+    Aho-Corasick if it does not add useful evidence
+
+NEVER REMOVE:
+
+    parser correctness
+    malformed-input handling
+    tests
+    sanitizers
+    fuzzing
+    policy correctness
+    atomic updates
+    failure testing
+    benchmarks
+    raw data
+    profiling
+    documentation
+
+
+============================================================
+68. PROJECT QUALITY BAR
+============================================================
+
+LEVEL 1 — STUDENT PROJECT
+
+    "It works."
+
+LEVEL 2 — STRONG PORTFOLIO PROJECT
+
+    "It works and is tested."
+
+LEVEL 3 — SYSTEMS ENGINEERING PROJECT
+
+    "It works, is tested, profiled, fuzzed, benchmarked, and fails safely."
+
+LEVEL 4 — EXCELLENT ENGINEERING/RESEARCH PORTFOLIO
+
+    "It works, is tested, fuzzed, profiled, benchmarked, deliberately
+     broken, repaired, experimentally evaluated, reproducible, and the
+     author can explain every major design trade-off."
+
+TARGET:
+
+    LEVEL 4.
+
+
+============================================================
+69. FINAL PRINCIPLES
+============================================================
+
+1. Correctness before optimization.
+
+2. Security before convenience.
+
+3. Benchmark before claiming performance.
+
+4. Profile before optimizing.
+
+5. Test malformed input.
+
+6. Treat all network input as hostile.
+
+7. Bound attacker-controlled resources.
+
+8. Keep the hot path small.
+
+9. Keep Python off the live path.
+
+10. Keep Go off the DNS hot path.
+
+11. Prefer simple designs before advanced ones.
+
+12. Use Aho-Corasick only if evidence supports it.
+
+13. Use io_uring only after the baseline is correct.
+
+14. Preserve raw experimental data.
+
+15. Record the exact environment.
+
+16. Keep negative results.
+
+17. Every fixed bug gets a regression test.
+
+18. Every important design choice gets documented.
+
+19. Never confuse a prototype with production software.
+
+20. Never invent performance or security results.
+
+21. Build one coherent system.
+
+22. BREAK IT ON PURPOSE.
+
+23. MEASURE WHY IT BROKE.
+
+24. FIX IT.
+
+25. PROVE THE FIX.
+
+
+============================================================
+70. FINAL PORTFOLIO STATEMENT
+============================================================
+
+ARM64 DNS Security Dataplane — C++ / Go / Python
+
+Designed and implemented a resource-conscious DNS security dataplane with a
+C++ packet-processing core, Go control-plane management, and Python
+offline threat-intelligence/benchmarking pipeline.
+
+The system implements DNS packet validation and parsing, domain
+normalization, policy enforcement, suffix-based matching, TTL-aware caching,
+upstream forwarding, concurrency, structured telemetry, atomic policy
+updates, and lightweight DNS anomaly detection.
+
+Engineering validation includes protocol regression testing, malformed-input
+testing, fuzzing, sanitizer instrumentation, packet-level validation,
+resource-limit testing, fault injection, profiling, and reproducible
+performance experiments.
+
+Research evaluation measures matcher design, cache behavior, rule-set
+scaling, security-processing overhead, concurrency, anomaly-detection cost,
+and—if justified—blocking sockets versus epoll versus io_uring.
+
+All performance and security claims are tied to documented workloads,
+raw experimental artifacts, and explicit limitations.
+
+
+============================================================
+71. FINAL OBJECTIVE
+============================================================
+
+The goal is NOT to make a repository that looks large.
+
+The goal is to make a repository where a strong systems/networking engineer
+can inspect the work and conclude:
+
+    "This person understands what happens below the framework layer."
+
+The strongest evidence is not:
+
+    number of files
+    number of technologies
+    number of features
+    size of dashboard
+
+The strongest evidence is:
+
+    packet bytes
+    C++ code
+    tests
+    crashes found
+    bugs fixed
+    sanitizer output
+    fuzzing corpus
+    packet captures
+    flamegraphs
+    benchmark data
+    failure experiments
+    architecture decisions
+    measured trade-offs
+    reproducible results
+
+FINAL DEVELOPMENT LOOP
+
+    LEARN
+      ->
+    IMPLEMENT
+      ->
+    TEST
+      ->
+    BREAK
+      ->
+    DEBUG
+      ->
+    FIX
+      ->
+    PROFILE
+      ->
+    MEASURE
+      ->
+    DOCUMENT
+      ->
+    ONLY THEN
+    OPTIMIZE / EXTEND
+
+============================================================
+END OF CISCO-FOCUSED MASTER PLAN V3.0
+============================================================

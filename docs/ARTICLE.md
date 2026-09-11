@@ -1,5 +1,6 @@
-# Building a Production-Grade DNS Security Dataplane in Zero-Copy C++20 and Go: From Kaminsky Poisoning Defense to 100K-Rule Suffix Tries
+# Building a Sub-Microsecond DNS Security Dataplane in Modern C++20 and Go: From Kaminsky Poisoning Defense to 100K-Rule Suffix Tries
 
+> **Official Publication:** [**Read on Medium**](https://medium.com/@namanbhatt-01/building-a-sub-microsecond-dns-security-dataplane-in-modern-c-20-and-go-99ba3dd00cd3)  
 > **Subtitle:** *An empirical deep-dive into zero-copy packet processing, lock-free RCU policy swapping, why Aho-Corasick fails at domain boundaries, and closing real-world DNS security loopholes.*  
 > **Author:** Naman Bhatt  
 > **Target Audience:** Systems Engineers, Network Security Architects, Core Infrastructure Teams  

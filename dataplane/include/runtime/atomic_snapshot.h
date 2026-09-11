@@ -1,12 +1,13 @@
 #pragma once
 
-#include "engine/suffix_trie.h"
-#include "engine/decision.h"
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 #include <memory>
 #include <atomic>
 #include <string_view>
+#include "engine/suffix_trie.h"
+#include "engine/decision.h"
 
 namespace dataplane::runtime {
 
@@ -45,6 +46,10 @@ struct PolicySnapshot {
 class SnapshotManager {
 public:
     static SnapshotManager& instance();
+    SnapshotManager(const SnapshotManager&) = delete;
+    SnapshotManager& operator=(const SnapshotManager&) = delete;
+    SnapshotManager(SnapshotManager&&) = delete;
+    SnapshotManager& operator=(SnapshotManager&&) = delete;
 
     // Lock-free reader path: acquires shared ownership of active snapshot
     std::shared_ptr<const PolicySnapshot> get_active_snapshot() const {

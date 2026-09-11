@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cstring>
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -172,7 +173,8 @@ void IpcServer::listen_loop() {
         if (n > 0) {
             buf[n] = '\0';
             std::string resp = handle_command(std::string(buf));
-            ::write(client_fd, resp.data(), resp.size());
+            ssize_t written = ::write(client_fd, resp.data(), resp.size());
+            (void)written;
         }
         ::close(client_fd);
     }

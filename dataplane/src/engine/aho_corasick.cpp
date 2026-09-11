@@ -1,5 +1,6 @@
 #include "engine/aho_corasick.h"
 #include <cctype>
+#include <cstdint>
 
 namespace dataplane::engine {
 

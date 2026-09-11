@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <queue>
 #include <string_view>
+#include <cstdint>
 
 namespace dataplane::engine {
 

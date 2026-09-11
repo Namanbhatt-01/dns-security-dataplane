@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 #include <string_view>
+#include <cstdint>
 
 namespace dataplane::engine {
 

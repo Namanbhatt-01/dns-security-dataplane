@@ -4,9 +4,10 @@
 Accepted
 
 ## Context
-In `1st.txt`, the hot path placed the TTL cache lookup **before** the policy evaluation engine:
-$$\text{Receive} \to \text{Parse} \to \text{Normalize} \to \text{Cache Lookup} \to \text{Policy Engine}$$
-As identified in `2nd.txt` (Loophole #3), this sequence creates a critical security hole. If domain `malicious.test` was previously resolved and cached with a 3600-second TTL, and subsequently the security control plane pushes an emergency block rule for `malicious.test`, the cache would continue serving `ALLOW` responses until the TTL expired 50 minutes later.
+In initial design drafts, the hot path placed the TTL cache lookup **before** the policy evaluation engine:
+`Client Query -> Cache Lookup (HIT) -> Return Answer`.
+
+During security architecture review (Vulnerability Analysis), this sequence was identified as a critical security hole. If domain `malicious.test` was previously resolved and cached with a 3600-second TTL, and subsequently the security control plane pushes an emergency block rule for `malicious.test`, the cache would continue serving `ALLOW` responses until the TTL expired 50 minutes later.
 
 Conversely, invalidating or wiping the entire cache on every policy reload destroys cache efficiency, causing sudden traffic surges to the upstream resolver.
 

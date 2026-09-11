@@ -13,7 +13,7 @@ DNS security inspection requires matching query domain names against tens or hun
   - `fakeexample.com` (not a sub-domain boundary)
   - `example.com.attacker.org` (attacker controls the apex)
 
-`1st.txt` proposed testing `std::unordered_set`, a Suffix Trie, and Aho-Corasick. `2nd.txt` warned against treating Aho-Corasick as a "buzzword trap" because DNS matching operates on discrete dot-separated labels, not arbitrary continuous character substrings.
+Initial design proposals considered testing `std::unordered_set`, a Suffix Trie, and Aho-Corasick. Architectural security review cautioned that DNS matching operates on discrete dot-separated labels, not arbitrary continuous character substrings, and that string automata could introduce memory and boundary verification flaws.
 
 ## Decision
 1. **Production Standard: Reverse-Label Suffix Trie**

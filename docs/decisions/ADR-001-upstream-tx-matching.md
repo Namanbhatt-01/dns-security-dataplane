@@ -6,7 +6,7 @@ Accepted
 ## Context
 When forwarding permitted DNS queries from the local dataplane to an upstream recursive resolver over UDP, the application is inherently exposed to spoofing and cache poisoning attacks (e.g., the Kaminsky attack). If an attacker predicts the transaction ID (TxID) and UDP source port, or if the dataplane blindly accepts any packet arriving on its listening port, an adversary can inject forged DNS records into the local cache, redirecting all downstream clients to malicious IPs.
 
-In `1st.txt` (V3.0), upstream communication was simply described as "forwarding permitted queries". `2nd.txt` correctly flagged this as a critical security correctness loophole.
+In initial design drafts, upstream communication was simply described as "forwarding permitted queries". During internal security architecture review, this was identified as a critical security correctness loophole.
 
 ## Problem
 How can the C++ dataplane guarantee that an incoming UDP response from an upstream server is authentic, strictly corresponds to an active in-flight request, and cannot be spoofed to corrupt the local cache?

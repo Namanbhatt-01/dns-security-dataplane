@@ -390,4 +390,4 @@ Because our C++ core is decoupled from the socket transport layer via `ByteSpan`
 
 ---
 
-*Written by Naman Bhatt — Systems & Network Security Engineer.*
+*Written by Naman Bhatt*

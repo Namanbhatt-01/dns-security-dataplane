@@ -1,13 +1,13 @@
 # DNS Wire Parser Fuzzing Campaign Report
 
-**Date:** Sep 11 2026 19:14:05  
+**Date:** Sep 12 2026 00:07:21  
 **Target Component:** `dataplane::dns::DnsParser::parse(ByteSpan)`  
 **Execution Engine:** Hostile Protocol Wire Mutator  
 
 ## Summary Results
 
 - **Total Iterations:** 100000
-- **Total Execution Time:** 26.3839 ms (3.79019 M packets/sec)
+- **Total Execution Time:** 20.9174 ms (4.7807 M packets/sec)
 - **Parser Crashes:** 0
 - **Gracefully Handled Protocol Rejections:** 84757
 - **Valid Parsed Packets:** 15243

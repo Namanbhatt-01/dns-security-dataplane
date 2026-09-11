@@ -3,6 +3,8 @@
 
 [![asciicast](https://asciinema.org/a/fJARAnJTFczeodSr.svg)](https://asciinema.org/a/fJARAnJTFczeodSr)
 
+📖 **Deep-Dive Engineering Publication:** **[docs/ARTICLE.md](docs/ARTICLE.md)** *(Building a Production-Grade DNS Security Dataplane in Zero-Copy C++20 and Go)*
+
 A high-performance, resource-conscious DNS security appliance implemented in zero-allocation C++20 with a Go control-plane management daemon and an offline Python benchmark pipeline. Built to RFC 1035 standards with empirical defense against cache poisoning, Kaminsky spoofing, stale-policy cache bypasses, and denial-of-service vectors.
 
 ---

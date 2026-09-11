@@ -23,6 +23,10 @@ Our empirical measurements across scales from 1,000 to 100,000 rules demonstrate
 
 ### Frame 1: Matcher Architectural Comparison Matrix (1,000 to 100,000 Rules)
 
+<p align="center">
+  <img src="../../evidence/perf/matcher_scaling_comparison.svg" alt="Suffix Trie vs Aho-Corasick Benchmark" width="100%"/>
+</p>
+
 | Scale | Architecture | Build Time (ms) | Memory (MB) | p50 Latency (ns) | p99 Latency (ns) | Mean Latency (ns) | Throughput (M ops/s) | FP Boundary Errors |
 |---|---|---|---|---|---|---|---|---|
 | **1,000** | Reverse-Label Suffix Trie | 0.81 ms | **0.20 MB** | 334.0 ns | 667.0 ns | 379.1 ns | 2.64 M/s | **0** |

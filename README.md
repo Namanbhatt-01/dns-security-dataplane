@@ -66,6 +66,10 @@ A high-performance, resource-conscious DNS security appliance implemented in zer
 
 ### Frame 1: Matcher Architectural Comparison (1,000 to 100,000 Rules)
 
+<p align="center">
+  <img src="evidence/perf/matcher_scaling_comparison.svg" alt="Suffix Trie vs Aho-Corasick Benchmark" width="100%"/>
+</p>
+
 *Measured via `make benchmark-matchers` across 100,000 iterations per scale with live resident memory (RSS) tracking:*
 
 | Scale | Architecture | Build Time | Memory | $p_{50}$ Latency | $p_{99}$ Latency | Throughput | FP Errors |

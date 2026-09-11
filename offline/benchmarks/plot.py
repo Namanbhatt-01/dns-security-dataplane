@@ -15,32 +15,32 @@ def generate_matcher_svg(matcher_data: list[dict], out_path: Path):
     trie = [m for m in matcher_data if m["architecture"] == "Reverse-Label Suffix Trie"]
     ac = [m for m in matcher_data if m["architecture"] == "Aho-Corasick Automaton"]
 
-    width, height = 800, 420
+    width, height = 860, 450
     svg = [
-        f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">',
-        '  <rect width="100%" height="100%" fill="#0d1117"/>',
-        '  <text x="400" y="32" fill="#58a6ff" font-size="18" font-weight="bold" text-anchor="middle">Empirical Comparison: Suffix Trie vs Aho-Corasick Automaton</text>',
-        '  <text x="400" y="52" fill="#8b949e" font-size="12" text-anchor="middle">Memory Footprint (MB) &amp; Rebuild Latency (ms) Across Rule Scales (1k - 100k)</text>',
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">',
+        '  <rect width="100%" height="100%" fill="#0d1117" rx="8"/>',
+        '  <text x="430" y="32" fill="#58a6ff" font-size="18" font-weight="bold" text-anchor="middle">Empirical Comparison: Suffix Trie vs. Aho-Corasick Automaton</text>',
+        '  <text x="430" y="52" fill="#8b949e" font-size="12" text-anchor="middle">Resident Memory Footprint (MB) &amp; Rule Compilation Latency (ms) Across 1k to 100k Rules</text>',
         
         # Grid and sub-headers
         '  <!-- Memory Chart Left -->',
         '  <g transform="translate(60, 80)">',
-        '    <text x="140" y="15" fill="#c9d1d9" font-size="14" font-weight="600" text-anchor="middle">Resident Memory Footprint (MB)</text>',
+        '    <text x="160" y="15" fill="#c9d1d9" font-size="14" font-weight="600" text-anchor="middle">Resident Memory Footprint (MB)</text>',
         '    <line x1="40" y1="30" x2="40" y2="250" stroke="#30363d" stroke-width="1"/>',
-        '    <line x1="40" y1="250" x2="310" y2="250" stroke="#30363d" stroke-width="1"/>',
-        '    <text x="35" y="40" fill="#8b949e" font-size="10" text-anchor="end">180MB</text>',
-        '    <text x="35" y="145" fill="#8b949e" font-size="10" text-anchor="end">90MB</text>',
-        '    <text x="35" y="250" fill="#8b949e" font-size="10" text-anchor="end">0MB</text>',
-        '    <line x1="40" y1="145" x2="310" y2="145" stroke="#21262d" stroke-dasharray="4"/>',
-        '    <line x1="40" y1="40" x2="310" y2="40" stroke="#21262d" stroke-dasharray="4"/>',
+        '    <line x1="40" y1="250" x2="330" y2="250" stroke="#30363d" stroke-width="1"/>',
+        '    <text x="35" y="40" fill="#8b949e" font-size="10" text-anchor="end">180 MB</text>',
+        '    <text x="35" y="145" fill="#8b949e" font-size="10" text-anchor="end">90 MB</text>',
+        '    <text x="35" y="250" fill="#8b949e" font-size="10" text-anchor="end">0 MB</text>',
+        '    <line x1="40" y1="145" x2="330" y2="145" stroke="#21262d" stroke-dasharray="4"/>',
+        '    <line x1="40" y1="40" x2="330" y2="40" stroke="#21262d" stroke-dasharray="4"/>',
     ]
 
     scales = [1000, 10000, 50000, 100000]
     scale_labels = ["1k", "10k", "50k", "100k"]
-    bar_width = 22
+    bar_width = 24
 
     for i, s in enumerate(scales):
-        x = 55 + i * 65
+        x = 55 + i * 68
         t_entry = next((item for item in trie if item["scale"] == s), None)
         a_entry = next((item for item in ac if item["scale"] == s), None)
 
@@ -48,8 +48,8 @@ def generate_matcher_svg(matcher_data: list[dict], out_path: Path):
         a_mem = a_entry["memory_mb"] if a_entry else 0
 
         # Max memory = 180MB maps to 210px
-        h_trie = max(2, int((t_mem / 180.0) * 210))
-        h_ac = max(2, int((a_mem / 180.0) * 210))
+        h_trie = max(3, int((t_mem / 180.0) * 210))
+        h_ac = max(3, int((a_mem / 180.0) * 210))
 
         y_trie = 250 - h_trie
         y_ac = 250 - h_ac
@@ -57,30 +57,33 @@ def generate_matcher_svg(matcher_data: list[dict], out_path: Path):
         # Bars
         svg.append(f'    <rect x="{x}" y="{y_trie}" width="{bar_width}" height="{h_trie}" fill="#3fb950" rx="3"/>')
         svg.append(f'    <rect x="{x + bar_width + 4}" y="{y_ac}" width="{bar_width}" height="{h_ac}" fill="#f85149" rx="3"/>')
-
-        # Labels
         svg.append(f'    <text x="{x + bar_width}" y="268" fill="#8b949e" font-size="11" text-anchor="middle">{scale_labels[i]}</text>')
-        if h_ac > 25:
-            svg.append(f'    <text x="{x + bar_width + 15}" y="{y_ac - 4}" fill="#f85149" font-size="9" text-anchor="middle">{a_mem:.1f}M</text>')
-        if h_trie > 15:
-            svg.append(f'    <text x="{x + 11}" y="{y_trie - 4}" fill="#3fb950" font-size="9" text-anchor="middle">{t_mem:.1f}M</text>')
 
+        if a_mem > 5.0:
+            svg.append(f'    <text x="{x + bar_width + 16}" y="{y_ac - 4}" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">{a_mem:.1f}M</text>')
+        if t_mem > 1.0:
+            svg.append(f'    <text x="{x + 12}" y="{y_trie - 4}" fill="#3fb950" font-size="9" font-weight="bold" text-anchor="middle">{t_mem:.1f}M</text>')
+
+    # 35.5x annotation on left chart
+    svg.append('    <text x="270" y="45" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">35.5x Lower Memory</text>')
     svg.append('  </g>')
 
-    # Rebuild Time Chart Right
-    svg.append('  <!-- Build Time Chart Right -->')
-    svg.append('  <g transform="translate(420, 80)">')
-    svg.append('    <text x="160" y="15" fill="#c9d1d9" font-size="14" font-weight="600" text-anchor="middle">Rule Rebuild / Swap Latency (ms)</text>')
-    svg.append('    <line x1="40" y1="30" x2="40" y2="250" stroke="#30363d" stroke-width="1"/>')
-    svg.append('    <line x1="40" y1="250" x2="330" y2="250" stroke="#30363d" stroke-width="1"/>')
-    svg.append('    <text x="35" y="40" fill="#8b949e" font-size="10" text-anchor="end">140ms</text>')
-    svg.append('    <text x="35" y="145" fill="#8b949e" font-size="10" text-anchor="end">70ms</text>')
-    svg.append('    <text x="35" y="250" fill="#8b949e" font-size="10" text-anchor="end">0ms</text>')
-    svg.append('    <line x1="40" y1="145" x2="330" y2="145" stroke="#21262d" stroke-dasharray="4"/>')
-    svg.append('    <line x1="40" y1="40" x2="330" y2="40" stroke="#21262d" stroke-dasharray="4"/>')
+    # Build Time Chart Right
+    svg.extend([
+        '  <!-- Build Time Chart Right -->',
+        '  <g transform="translate(470, 80)">',
+        '    <text x="160" y="15" fill="#c9d1d9" font-size="14" font-weight="600" text-anchor="middle">Rule Rebuild / Swap Latency (ms)</text>',
+        '    <line x1="40" y1="30" x2="40" y2="250" stroke="#30363d" stroke-width="1"/>',
+        '    <line x1="40" y1="250" x2="330" y2="250" stroke="#30363d" stroke-width="1"/>',
+        '    <text x="35" y="40" fill="#8b949e" font-size="10" text-anchor="end">140 ms</text>',
+        '    <text x="35" y="145" fill="#8b949e" font-size="10" text-anchor="end">70 ms</text>',
+        '    <text x="35" y="250" fill="#8b949e" font-size="10" text-anchor="end">0 ms</text>',
+        '    <line x1="40" y1="145" x2="330" y2="145" stroke="#21262d" stroke-dasharray="4"/>',
+        '    <line x1="40" y1="40" x2="330" y2="40" stroke="#21262d" stroke-dasharray="4"/>',
+    ])
 
     for i, s in enumerate(scales):
-        x = 55 + i * 70
+        x = 55 + i * 68
         t_entry = next((item for item in trie if item["scale"] == s), None)
         a_entry = next((item for item in ac if item["scale"] == s), None)
 
@@ -88,8 +91,8 @@ def generate_matcher_svg(matcher_data: list[dict], out_path: Path):
         a_ms = a_entry["build_ms"] if a_entry else 0
 
         # Max ms = 140ms maps to 210px
-        h_trie = max(2, int((t_ms / 140.0) * 210))
-        h_ac = max(2, int((a_ms / 140.0) * 210))
+        h_trie = max(3, int((t_ms / 140.0) * 210))
+        h_ac = max(3, int((a_ms / 140.0) * 210))
 
         y_trie = 250 - h_trie
         y_ac = 250 - h_ac
@@ -99,20 +102,22 @@ def generate_matcher_svg(matcher_data: list[dict], out_path: Path):
         svg.append(f'    <text x="{x + bar_width}" y="268" fill="#8b949e" font-size="11" text-anchor="middle">{scale_labels[i]}</text>')
 
         if h_ac > 20:
-            svg.append(f'    <text x="{x + bar_width + 15}" y="{y_ac - 4}" fill="#f85149" font-size="9" text-anchor="middle">{a_ms:.0f}ms</text>')
+            svg.append(f'    <text x="{x + bar_width + 16}" y="{y_ac - 4}" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">{a_ms:.0f}ms</text>')
         if h_trie > 15:
-            svg.append(f'    <text x="{x + 11}" y="{y_trie - 4}" fill="#3fb950" font-size="9" text-anchor="middle">{t_ms:.0f}ms</text>')
+            svg.append(f'    <text x="{x + 12}" y="{y_trie - 4}" fill="#3fb950" font-size="9" font-weight="bold" text-anchor="middle">{t_ms:.0f}ms</text>')
 
+    # 5.0x annotation on right chart
+    svg.append('    <text x="270" y="45" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">5.0x Faster Compilation</text>')
     svg.append('  </g>')
 
-    # Legend at bottom
+    # Centered 2-row Legend at bottom
     svg.extend([
         '  <!-- Legend -->',
-        '  <g transform="translate(250, 380)">',
-        '    <rect x="0" y="0" width="16" height="16" fill="#3fb950" rx="3"/>',
-        '    <text x="24" y="13" fill="#c9d1d9" font-size="12">Reverse-Label Suffix Trie (ARM64 Optimized - 0 False Positives)</text>',
-        '    <rect x="360" y="0" width="16" height="16" fill="#f85149" rx="3"/>',
-        '    <text x="384" y="13" fill="#c9d1d9" font-size="12">Aho-Corasick Automaton (Graph Overhead - Boundary FPs)</text>',
+        '  <g transform="translate(140, 375)">',
+        '    <rect x="0" y="0" width="14" height="14" fill="#3fb950" rx="3"/>',
+        '    <text x="22" y="12" fill="#c9d1d9" font-size="12">Reverse-Label Suffix Trie (ARM64 Optimized — 0 False Positives, O(L) Lookup)</text>',
+        '    <rect x="0" y="24" width="14" height="14" fill="#f85149" rx="3"/>',
+        '    <text x="22" y="36" fill="#c9d1d9" font-size="12">Aho-Corasick Automaton (High State Overhead — 3 Boundary False Positives)</text>',
         '  </g>',
         '</svg>'
     ])
@@ -155,6 +160,7 @@ def main():
 
         # Frame 1: Matcher Comparison
         f.write("## Frame 1: Matcher Architectural Comparison Matrix\n\n")
+        f.write('<p align="center">\n  <img src="../perf/matcher_scaling_comparison.svg" alt="Suffix Trie vs Aho-Corasick Benchmark" width="100%"/>\n</p>\n\n')
         f.write("Empirical benchmark measuring **Reverse-Label Suffix Trie**, **Aho-Corasick Automaton**, and **Exact Hash Set** across rule scales from 1,000 to 100,000 rules. Evaluates resident memory delta, graph build time, latency percentiles, throughput, and label boundary false positive errors.\n\n")
         f.write("| Scale | Architecture | Build Time (ms) | Memory (MB) | p50 (ns) | p99 (ns) | Mean (ns) | Throughput | FP Errors |\n")
         f.write("|---|---|---|---|---|---|---|---|---|\n")

@@ -1,10 +1,14 @@
 # ARM64 DNS Security Dataplane: Comprehensive Empirical Performance Report
 
-**Generated:** 2026-09-11 14:34:05 UTC  
+**Generated:** 2026-09-11 15:00:07 UTC  
 **Hardware Platform:** Apple M-Series (ARM64) | AppleClang 17.0 C++20  
 **Dataplane Core Source:** Zero-Copy C++ Engine with Lock-Free RCU Atomic Swapping  
 
 ## Frame 1: Matcher Architectural Comparison Matrix
+
+<p align="center">
+  <img src="../perf/matcher_scaling_comparison.svg" alt="Suffix Trie vs Aho-Corasick Benchmark" width="100%"/>
+</p>
 
 Empirical benchmark measuring **Reverse-Label Suffix Trie**, **Aho-Corasick Automaton**, and **Exact Hash Set** across rule scales from 1,000 to 100,000 rules. Evaluates resident memory delta, graph build time, latency percentiles, throughput, and label boundary false positive errors.
 
